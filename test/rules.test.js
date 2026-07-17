@@ -45,6 +45,8 @@ function sheet(entries, overrides = {}) {
     department: "企管碩一",
     studentId: "114000001",
     phone: "0912345678",
+    footerSignatureFound: true,
+    footerSignature: "柯同學",
     entries,
     claimedTotalHours: entries.reduce((sum, item) => sum + Number(item.hours || 0), 0),
     claimedTotalPay: entries.reduce((sum, item) => sum + Number(item.pay || 0), 0),
@@ -128,6 +130,46 @@ test("asks for review when the written signature text differs from the name", ()
 
   assert.ok(codes(result).includes("SIGNATURE_NAME_MISMATCH"));
   assert.match(result.declarations.find((item) => item.code === "SIGNATURES_COMPLETE").label, /本人手寫簽名.*姓名相同/);
+});
+
+test("does not demand a break when accumulated work stays within four hours", () => {
+  const result = checkTimesheet(sheet([
+    entry({ id: "1", start: "09:00", end: "11:00", hours: 2, pay: 392 }),
+    entry({ id: "2", start: "11:20", end: "13:20", hours: 2, pay: 392 })
+  ]), profile);
+
+  assert.ok(!codes(result).includes("BREAK_REQUIRED"));
+});
+
+test("demands a break when accumulated work passes four hours without a thirty-minute rest", () => {
+  const result = checkTimesheet(sheet([
+    entry({ id: "1", start: "09:00", end: "11:00", hours: 2, pay: 392 }),
+    entry({ id: "2", start: "11:10", end: "13:30", hours: 2.33, pay: 456.68 })
+  ]), profile);
+
+  assert.ok(codes(result).includes("BREAK_REQUIRED"));
+});
+
+test("tells students apart between a blank wage and a miscalculated wage", () => {
+  const blank = checkTimesheet(sheet([entry({ pay: "" })]), profile);
+  assert.match(blank.issues.find((issue) => issue.code === "ROW_PAY_MISMATCH").message, /未填寫/);
+
+  const wrong = checkTimesheet(sheet([entry({ pay: 500 })]), profile);
+  assert.doesNotMatch(wrong.issues.find((issue) => issue.code === "ROW_PAY_MISMATCH").message, /未填寫/);
+});
+
+test("checks the footer signature like the per-row signatures", () => {
+  const missingField = checkTimesheet(sheet([entry()], { footerSignatureFound: false, footerSignature: "" }), profile);
+  assert.ok(codes(missingField).includes("FOOTER_SIGNATURE_CHECK"));
+
+  const blank = checkTimesheet(sheet([entry()], { footerSignature: "" }), profile);
+  assert.ok(codes(blank).includes("FOOTER_SIGNATURE_REQUIRED"));
+
+  const different = checkTimesheet(sheet([entry()], { footerSignature: "陳同學" }), profile);
+  assert.ok(codes(different).includes("FOOTER_SIGNATURE_NAME_MISMATCH"));
+
+  const matching = checkTimesheet(sheet([entry()]), profile);
+  assert.ok(!codes(matching).some((code) => code.startsWith("FOOTER_SIGNATURE")));
 });
 
 test("flags blocked dates, weekends and late work", () => {

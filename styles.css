@@ -554,6 +554,12 @@ textarea:disabled { opacity: 0.55; cursor: not-allowed; }
 .admin-layout { display: grid; gap: var(--space-lg); padding-block: var(--space-xl) var(--space-3xl); }
 .admin-list { display: grid; gap: var(--space-xs); }
 .admin-list button { width: 100%; justify-content: flex-start; overflow: hidden; text-align: start; text-overflow: ellipsis; }
+.admin-list__item { display: grid; gap: var(--space-3xs); }
+.admin-list__item[data-selected="true"] { border-color: var(--color-accent); background: var(--color-paper-2); }
+.admin-list__item[data-inactive="true"] > span { color: var(--color-muted); }
+.admin-list__meta { color: var(--color-muted); font-size: var(--text-xs); font-weight: 400; }
+.form-section { display: grid; gap: var(--space-md); margin: 0; padding: var(--space-md); border: var(--rule-thin) solid var(--color-rule); border-radius: var(--radius-md); }
+.form-section > legend { padding-inline: var(--space-2xs); font-weight: 800; }
 .switch-row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-md); }
 .switch-row input { width: 1.25rem; height: 1.25rem; accent-color: var(--color-accent); }
 .tag-list { display: flex; flex-wrap: wrap; gap: var(--space-xs); }

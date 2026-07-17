@@ -59,6 +59,35 @@ test("infers a Gregorian date from the ROC year in photographed text", () => {
   assert.equal(result.claimedTotalPay, "");
 });
 
+test("splits work content using the project rules passed in options", () => {
+  const result = parseOcrText("1 7/1 09:00 12:00 3 588 維澈樓312研究室 資料標註整理 柯同學", { year: 2026, month: 7 }, {
+    workContents: ["資料標註整理"]
+  });
+
+  assert.equal(result.entries[0].location, "維澈樓312研究室");
+  assert.equal(result.entries[0].workContent, "資料標註整理");
+  assert.equal(result.entries[0].signature, "柯同學");
+});
+
+test("finds the footer signature line in photographed text", () => {
+  const signed = parseOcrText(`
+    1 7/1 09:00 12:00 3 588 維澈樓312研究室 課程字幕製作
+    工讀生簽名：柯同學
+  `, { year: 2026, month: 7 });
+  assert.equal(signed.footerSignatureFound, true);
+  assert.equal(signed.footerSignature, "柯同學");
+
+  const missing = parseOcrText("1 7/1 09:00 12:00 3 588 維澈樓312研究室 課程字幕製作", { year: 2026, month: 7 });
+  assert.equal(missing.footerSignatureFound, false);
+});
+
+test("keeps a blank photographed name blank instead of swallowing the next label", () => {
+  const result = parseOcrText("姓名： 學系：企管碩一 學號：114000001", { year: 2026, month: 7 });
+
+  assert.equal(result.name, "");
+  assert.equal(result.department, "企管碩一");
+});
+
 test("keeps a photographed row when the wage cell is blank", () => {
   const result = parseOcrText("1 7/1 09:00 12:00 3 維澈樓312研究室 課程字幕製作", { year: 2026, month: 7 });
 

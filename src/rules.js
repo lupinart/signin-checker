@@ -185,13 +185,21 @@ function validateEntry(item, profile, issues) {
   if (start !== null && end !== null && end > start) {
     calculatedMinutes = end - start;
     const calculatedHours = roundHours(calculatedMinutes);
-    if (Math.abs(Number(item.hours) - calculatedHours) > 0.001) {
+    if (!text(item.hours)) {
+      issues.push(makeIssue("ROW_HOURS_MISMATCH", SEVERITY.error, `本筆時數未填寫，依起訖時間應為 ${calculatedHours} 小時。`, {
+        entryIds: [item.id], field: "hours"
+      }));
+    } else if (Math.abs(Number(item.hours) - calculatedHours) > 0.001) {
       issues.push(makeIssue("ROW_HOURS_MISMATCH", SEVERITY.error, `依起訖時間應為 ${calculatedHours} 小時，與填寫時數不一致。`, {
         entryIds: [item.id], field: "hours"
       }));
     }
     const expectedPay = roundMoney(calculatedHours * Number(profile.hourlyRate));
-    if (Math.abs(Number(item.pay) - expectedPay) > 0.001) {
+    if (!text(item.pay)) {
+      issues.push(makeIssue("ROW_PAY_MISMATCH", SEVERITY.error, `本筆工作酬金未填寫，應為 ${expectedPay} 元（${calculatedHours} 小時 × 時薪 ${Number(profile.hourlyRate)} 元）。`, {
+        entryIds: [item.id], field: "pay"
+      }));
+    } else if (Math.abs(Number(item.pay) - expectedPay) > 0.001) {
       issues.push(makeIssue("ROW_PAY_MISMATCH", SEVERITY.error, `本筆工作酬金應為 ${expectedPay} 元（${calculatedHours} 小時 × 時薪 ${Number(profile.hourlyRate)} 元）。`, {
         entryIds: [item.id], field: "pay"
       }));
@@ -227,8 +235,8 @@ function addDailyIssues(validated, issues) {
       }));
     }
 
-    let chainStart = sorted[0].startMinutes;
     let chainEnd = sorted[0].endMinutes;
+    let chainWorked = sorted[0].calculatedMinutes;
     let chainIds = [sorted[0].id];
     for (let index = 1; index < sorted.length; index += 1) {
       const previous = sorted[index - 1];
@@ -241,24 +249,46 @@ function addDailyIssues(validated, issues) {
 
       const gap = current.startMinutes - chainEnd;
       if (gap >= 30) {
-        if (chainEnd - chainStart > 240) {
-          issues.push(makeIssue("BREAK_REQUIRED", SEVERITY.error, `${date} 連續工作超過 4 小時，期間沒有至少 30 分鐘休息。`, {
+        if (chainWorked > 240) {
+          issues.push(makeIssue("BREAK_REQUIRED", SEVERITY.error, `${date} 累計工作超過 4 小時，期間沒有至少 30 分鐘休息。`, {
             entryIds: chainIds, field: "time"
           }));
         }
-        chainStart = current.startMinutes;
         chainEnd = current.endMinutes;
+        chainWorked = current.calculatedMinutes;
         chainIds = [current.id];
       } else {
         chainEnd = Math.max(chainEnd, current.endMinutes);
+        chainWorked += current.calculatedMinutes;
         chainIds.push(current.id);
       }
     }
-    if (chainEnd - chainStart > 240) {
-      issues.push(makeIssue("BREAK_REQUIRED", SEVERITY.error, `${date} 連續工作超過 4 小時，期間沒有至少 30 分鐘休息。`, {
+    if (chainWorked > 240) {
+      issues.push(makeIssue("BREAK_REQUIRED", SEVERITY.error, `${date} 累計工作超過 4 小時，期間沒有至少 30 分鐘休息。`, {
         entryIds: chainIds, field: "time"
       }));
     }
+  }
+}
+
+function addFooterSignatureIssues(sheet, sheetName, issues) {
+  const value = text(sheet.footerSignature).replaceAll(/[（(]手簽[)）]/g, "").replaceAll(/\s+/g, "");
+  if (!sheet.footerSignatureFound) {
+    issues.push(makeIssue("FOOTER_SIGNATURE_CHECK", SEVERITY.review, "沒有辨識到文件下方的簽名欄，請人工確認頁尾已由本人手寫簽名。", {
+      field: "footerSignature"
+    }));
+    return;
+  }
+  if (!value) {
+    issues.push(makeIssue("FOOTER_SIGNATURE_REQUIRED", SEVERITY.error, "文件下方簽名欄空白，請由本人手寫簽名。", {
+      field: "footerSignature"
+    }));
+    return;
+  }
+  if (sheetName && !value.includes(sheetName) && !sheetName.includes(value)) {
+    issues.push(makeIssue("FOOTER_SIGNATURE_NAME_MISMATCH", SEVERITY.review, "文件下方簽名似乎與上方姓名不同，請人工確認是本人手寫。", {
+      field: "footerSignature"
+    }));
   }
 }
 
@@ -283,14 +313,19 @@ export function checkTimesheet(sheet, profile) {
   const validated = (sheet.entries ?? []).map((item) => validateEntry(item, profileWithName, issues));
   addDailyIssues(validated, issues);
   addWeeklyIssues(validated, issues);
+  addFooterSignatureIssues(sheet, profileWithName.sheetName, issues);
 
   const totalMinutes = validated.reduce((sum, item) => sum + item.calculatedMinutes, 0);
   const totalHours = roundHours(totalMinutes);
   const totalPay = roundMoney(totalHours * Number(profile.hourlyRate));
-  if (Math.abs(Number(sheet.claimedTotalHours) - totalHours) > 0.001) {
+  if (!text(sheet.claimedTotalHours)) {
+    issues.push(makeIssue("TOTAL_HOURS_MISMATCH", SEVERITY.error, `合計時數未填寫，應為 ${totalHours} 小時。`, { field: "totalHours" }));
+  } else if (Math.abs(Number(sheet.claimedTotalHours) - totalHours) > 0.001) {
     issues.push(makeIssue("TOTAL_HOURS_MISMATCH", SEVERITY.error, `合計時數應為 ${totalHours} 小時。`, { field: "totalHours" }));
   }
-  if (Math.abs(Number(sheet.claimedTotalPay) - totalPay) > 0.001) {
+  if (!text(sheet.claimedTotalPay)) {
+    issues.push(makeIssue("TOTAL_PAY_MISMATCH", SEVERITY.error, `合計金額未填寫，應為 ${totalPay} 元（合計 ${totalHours} 小時 × 時薪 ${Number(profile.hourlyRate)} 元）。`, { field: "totalPay" }));
+  } else if (Math.abs(Number(sheet.claimedTotalPay) - totalPay) > 0.001) {
     issues.push(makeIssue("TOTAL_PAY_MISMATCH", SEVERITY.error, `合計金額應為 ${totalPay} 元（合計 ${totalHours} 小時 × 時薪 ${Number(profile.hourlyRate)} 元）。`, { field: "totalPay" }));
   }
 

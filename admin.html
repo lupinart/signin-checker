@@ -60,47 +60,60 @@
         <form class="panel" id="profile-form" novalidate>
           <div class="panel__header">
             <div><h2 id="editor-title">編輯規則</h2><p class="helper" id="editor-version"></p></div>
-            <label class="switch-row" for="active"><span>啟用</span><input id="active" name="active" type="checkbox"></label>
+            <label class="switch-row" for="active"><span><strong>啟用</strong><br><small>關閉後學生頁不會載入</small></span><input id="active" name="active" type="checkbox"></label>
           </div>
           <div class="panel__body">
             <input id="profile-id" name="id" type="hidden">
-            <div class="field-grid field-grid--3">
-              <div class="field"><label for="admin-plan-name">計畫名稱</label><input class="input" id="admin-plan-name" name="planName" required></div>
-              <div class="field"><label for="admin-plan-number">計畫編號</label><input class="input" id="admin-plan-number" name="planNumber" required></div>
-              <div class="field"><label for="admin-unit">執行單位</label><input class="input" id="admin-unit" name="unit" required></div>
-            </div>
 
-            <fieldset class="field">
-              <legend class="field__label">允許工作星期</legend>
-              <div class="tag-list" id="weekday-options">
-                <label class="tag"><input type="checkbox" name="allowedWeekdays" value="1"> 星期一</label>
-                <label class="tag"><input type="checkbox" name="allowedWeekdays" value="2"> 星期二</label>
-                <label class="tag"><input type="checkbox" name="allowedWeekdays" value="3"> 星期三</label>
-                <label class="tag"><input type="checkbox" name="allowedWeekdays" value="4"> 星期四</label>
-                <label class="tag"><input type="checkbox" name="allowedWeekdays" value="5"> 星期五</label>
-                <label class="tag"><input type="checkbox" name="allowedWeekdays" value="6"> 星期六</label>
-                <label class="tag"><input type="checkbox" name="allowedWeekdays" value="0"> 星期日</label>
+            <fieldset class="form-section">
+              <legend>基本資料</legend>
+              <div class="field-grid field-grid--3">
+                <div class="field"><label for="admin-plan-name">計畫名稱</label><input class="input" id="admin-plan-name" name="planName" required></div>
+                <div class="field"><label for="admin-plan-number">計畫編號</label><input class="input" id="admin-plan-number" name="planNumber" required></div>
+                <div class="field"><label for="admin-unit">執行單位</label><input class="input" id="admin-unit" name="unit" required></div>
               </div>
+              <p class="helper">學生上傳的簽到單會用「計畫編號、計畫名稱」自動對應到這份規則，請與正式表單完全一致。</p>
             </fieldset>
 
-            <div class="field-grid field-grid--3">
-              <div class="field"><label for="hourly-rate">時薪</label><input class="input" id="hourly-rate" name="hourlyRate" type="number" min="1" step="1" required></div>
-              <div class="field"><label for="earliest-start">最早開始</label><input class="input" id="earliest-start" name="earliestStart" type="time"></div>
-              <div class="field"><label for="latest-end">最晚結束</label><input class="input" id="latest-end" name="latestEnd" type="time"></div>
-            </div>
+            <fieldset class="form-section">
+              <legend>工作時間</legend>
+              <div class="field">
+                <span class="field__label">允許工作星期</span>
+                <div class="tag-list" id="weekday-options">
+                  <label class="tag"><input type="checkbox" name="allowedWeekdays" value="1"> 星期一</label>
+                  <label class="tag"><input type="checkbox" name="allowedWeekdays" value="2"> 星期二</label>
+                  <label class="tag"><input type="checkbox" name="allowedWeekdays" value="3"> 星期三</label>
+                  <label class="tag"><input type="checkbox" name="allowedWeekdays" value="4"> 星期四</label>
+                  <label class="tag"><input type="checkbox" name="allowedWeekdays" value="5"> 星期五</label>
+                  <label class="tag"><input type="checkbox" name="allowedWeekdays" value="6"> 星期六</label>
+                  <label class="tag"><input type="checkbox" name="allowedWeekdays" value="0"> 星期日</label>
+                </div>
+              </div>
+              <div class="field-grid field-grid--3">
+                <div class="field"><label for="hourly-rate">時薪</label><input class="input" id="hourly-rate" name="hourlyRate" type="number" min="1" step="1" required></div>
+                <div class="field"><label for="earliest-start">最早開始</label><input class="input" id="earliest-start" name="earliestStart" type="time"></div>
+                <div class="field"><label for="latest-end">最晚結束</label><input class="input" id="latest-end" name="latestEnd" type="time"></div>
+              </div>
+              <div class="field"><label for="blocked-dates">休假／停班日期</label><textarea id="blocked-dates" name="blockedDates"></textarea><small>每行一個日期，可填 2026-07-17 或 2026/7/17，儲存時會自動統一格式。</small></div>
+            </fieldset>
 
-            <div class="field-grid field-grid--2">
-              <label class="switch-row" for="school-only"><span><strong>限校內工作地點</strong><br><small>關閉後不判定校外地點錯誤</small></span><input id="school-only" name="schoolOnly" type="checkbox"></label>
-              <label class="switch-row" for="require-room"><span><strong>要求研究室房號</strong><br><small>地點必須包含數字房號</small></span><input id="require-room" name="requireRoom" type="checkbox"></label>
-            </div>
+            <fieldset class="form-section">
+              <legend>工作地點</legend>
+              <div class="field-grid field-grid--2">
+                <label class="switch-row" for="school-only"><span><strong>限校內工作地點</strong><br><small>關閉後不判定校外地點錯誤</small></span><input id="school-only" name="schoolOnly" type="checkbox"></label>
+                <label class="switch-row" for="require-room"><span><strong>要求研究室房號</strong><br><small>地點必須包含數字房號</small></span><input id="require-room" name="requireRoom" type="checkbox"></label>
+              </div>
+              <div class="field"><label for="location-prompt">工作地點提示</label><input class="input" id="location-prompt" name="locationPrompt"></div>
+              <div class="field"><label for="required-location-keywords">校內地點必要文字</label><textarea id="required-location-keywords" name="requiredKeywords"></textarea><small>每行一個；符合其中一個才通過。例如本專案填「研究室」。留空則不檢查。</small></div>
+              <div class="field"><label for="forbidden-keywords">禁止地點關鍵字</label><textarea id="forbidden-keywords" name="forbiddenKeywords"></textarea><small>每行一個，例如「家裡」。</small></div>
+              <div class="field"><label for="sample-values">範例地點文字</label><textarea id="sample-values" name="sampleValues"></textarea><small>學生填寫相同文字時，要求再次確認是否照抄。</small></div>
+            </fieldset>
 
-            <div class="field"><label for="location-prompt">工作地點提示</label><input class="input" id="location-prompt" name="locationPrompt"></div>
-            <div class="field"><label for="required-location-keywords">校內地點必要文字</label><textarea id="required-location-keywords" name="requiredKeywords"></textarea><small>每行一個；符合其中一個才通過。例如本專案填「研究室」。留空則不檢查。</small></div>
-            <div class="field"><label for="forbidden-keywords">禁止地點關鍵字</label><textarea id="forbidden-keywords" name="forbiddenKeywords"></textarea><small>每行一個，例如「家裡」。</small></div>
-            <div class="field"><label for="sample-values">範例地點文字</label><textarea id="sample-values" name="sampleValues"></textarea><small>學生填寫相同文字時，要求再次確認是否照抄。</small></div>
-            <div class="field"><label for="work-contents">允許的工作內容</label><textarea id="work-contents" name="allowedWorkContents"></textarea><small>每行一個；全部留空時改為人工確認。</small></div>
-            <div class="field"><label for="blocked-dates">休假／停班日期</label><textarea id="blocked-dates" name="blockedDates"></textarea><small>每行一個完整日期，例如 2026-07-17。</small></div>
-            <div class="field"><label for="profile-note">補充提醒</label><textarea id="profile-note" name="note"></textarea></div>
+            <fieldset class="form-section">
+              <legend>工作內容與備註</legend>
+              <div class="field"><label for="work-contents">允許的工作內容</label><textarea id="work-contents" name="allowedWorkContents"></textarea><small>每行一個；全部留空時改為人工確認。照片辨識也會用這份清單切出「工作內容」欄，建議填完整。</small></div>
+              <div class="field"><label for="profile-note">補充提醒</label><textarea id="profile-note" name="note"></textarea></div>
+            </fieldset>
 
             <div class="callout callout--error" id="profile-errors" hidden role="alert"></div>
             <div class="actions">

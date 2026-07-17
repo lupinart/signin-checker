@@ -9,7 +9,13 @@ const cell = (value) => value?.raw
   : `<w:tc><w:p><w:r><w:t>${value}</w:t></w:r></w:p></w:tc>`;
 const row = (values) => `<w:tr>${values.map(cell).join("")}</w:tr>`;
 
-function docxFixture({ annotatedPay = false, secondPayValue = "588", totals = true } = {}) {
+function docxFixture({
+  annotatedPay = false,
+  secondPayValue = "588",
+  totals = true,
+  personalLine = "姓 名：柯同學　學系：企管碩一　學號：114000001　聯絡電話：0912345678",
+  footerLine = ""
+} = {}) {
   const secondPay = annotatedPay
     ? { raw: `<w:r><w:drawing><wps:txbx xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape"><w:txbxContent><w:p><w:r><w:t>❌ 連續4小時，1天不可超過8小時</w:t></w:r></w:p></w:txbxContent></wps:txbx></w:drawing></w:r><w:r><w:t>588</w:t></w:r>` }
     : secondPayValue;
@@ -20,7 +26,7 @@ function docxFixture({ annotatedPay = false, secondPayValue = "588", totals = tr
         <w:p><w:r><w:t>一、計畫名稱：A82 發展雲端知識體系計畫</w:t></w:r></w:p>
         <w:p><w:r><w:t>二、執行單位：數位教育發展處數位課程發展組</w:t></w:r></w:p>
         <w:p><w:r><w:t>三、計畫編號：115609782</w:t></w:r></w:p>
-        <w:p><w:r><w:t>姓 名：柯同學　學系：企管碩一　學號：114000001　聯絡電話：0912345678</w:t></w:r></w:p>
+        <w:p><w:r><w:t>${personalLine}</w:t></w:r></w:p>
         <w:tbl>
           ${row(["編號", "工作日期", "開始", "結束", "時數", "工作酬金", "工作地點", "工作內容", "簽章"])}
           ${row(["1", "7/1", "9:00", "12:00", "3", "588", "維澈樓312研究室", "課程字幕製作", "柯同學"])}
@@ -28,6 +34,7 @@ function docxFixture({ annotatedPay = false, secondPayValue = "588", totals = tr
         </w:tbl>
         ${totals ? `<w:p><w:r><w:t>計酬基準196元/時 X 6小時</w:t></w:r></w:p>
         <w:p><w:r><w:t>金額:1176元</w:t></w:r></w:p>` : ""}
+        ${footerLine ? `<w:p><w:r><w:t>${footerLine}</w:t></w:r></w:p>` : ""}
       </w:body>
     </w:document>`;
   return zipSync({ "word/document.xml": strToU8(xml) });
@@ -57,6 +64,28 @@ test("parses plan metadata, work rows and totals from a DOCX in memory", async (
   });
   assert.equal(result.claimedTotalHours, 6);
   assert.equal(result.claimedTotalPay, 1176);
+});
+
+test("keeps a blank name blank instead of swallowing the next label", async () => {
+  const result = await parseDocx(docxFixture({
+    personalLine: "姓 名：　學系：企管碩一　學號：114000001　聯絡電話：0912345678"
+  }), { year: 2026, month: 7 });
+
+  assert.equal(result.name, "");
+  assert.equal(result.department, "企管碩一");
+});
+
+test("extracts the footer signature and reports when the field is missing", async () => {
+  const signed = await parseDocx(docxFixture({ footerLine: "工讀生簽名：柯同學" }), { year: 2026, month: 7 });
+  assert.equal(signed.footerSignatureFound, true);
+  assert.equal(signed.footerSignature, "柯同學");
+
+  const blank = await parseDocx(docxFixture({ footerLine: "工讀生簽名：" }), { year: 2026, month: 7 });
+  assert.equal(blank.footerSignatureFound, true);
+  assert.equal(blank.footerSignature, "");
+
+  const missing = await parseDocx(docxFixture(), { year: 2026, month: 7 });
+  assert.equal(missing.footerSignatureFound, false);
 });
 
 test("infers the Gregorian year and month from a ROC document heading", async () => {

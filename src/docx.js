@@ -1,4 +1,5 @@
 import { strFromU8, unzipSync } from "fflate";
+import { footerSignature, personalValue } from "./fields.js";
 import { inferPeriod } from "./period.js";
 
 function decodeXml(value) {
@@ -64,13 +65,6 @@ function metadata(lines, label, nextLabel) {
   return (nextLabel ? after.split(nextLabel)[0] : after).replace(/^\s*[：:]\s*/, "").trim();
 }
 
-function personalValue(value, label, nextLabels) {
-  const compact = String(value).replaceAll(/\s+/g, "");
-  const next = nextLabels.join("|");
-  const match = new RegExp(`${label}[：:]?(.+?)(?=${next}|$)`).exec(compact);
-  return match ? match[1].replace(/^□?/, "").replace(/□$/, "") : "";
-}
-
 function workEntry(cells, context) {
   const id = numberValue(cells[0]);
   if (!id) return null;
@@ -134,8 +128,11 @@ export async function parseDocx(input, fallbackContext = {}) {
   const personalText = xmlText(rawXml);
   const hoursMatch = /(?:X|×)\s*(\d+(?:\.\d+)?)\s*小時/i.exec(completeText);
   const payMatch = /金額\s*[:：]?\s*(\d[\d,]*(?:\.\d+)?)\s*元/.exec(completeText);
+  const footer = footerSignature(lines);
 
   return {
+    footerSignatureFound: footer.found,
+    footerSignature: footer.value,
     planName: metadata(lines, "計畫名稱", "二、"),
     planNumber: metadata(lines, "計畫編號", "四、"),
     unit: metadata(lines, "執行單位", "三、"),

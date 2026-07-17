@@ -43,11 +43,26 @@ export function findProfile(profiles, sheet) {
   return name ? active.find((profile) => normalized(profile.planName) === name) ?? null : null;
 }
 
+export function normalizeDateText(value) {
+  const match = /^(\d{4})\s*[-/.年]\s*(\d{1,2})\s*[-/.月]\s*(\d{1,2})\s*日?$/.exec(String(value ?? "").trim());
+  if (!match) return null;
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+  return `${match[1]}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
 export function validateProfile(profile) {
   const errors = [];
   if (!String(profile.planName ?? "").trim()) errors.push("計畫名稱未填寫。");
   if (!String(profile.planNumber ?? "").trim()) errors.push("計畫編號未填寫。");
   if (!String(profile.unit ?? "").trim()) errors.push("執行單位未填寫。");
   if (!(Number(profile.hourlyRate) > 0)) errors.push("時薪必須大於 0。");
+  for (const value of profile.blockedDates ?? []) {
+    if (!normalizeDateText(value)) errors.push(`休假日期「${value}」無法辨識，請改成 2026-07-17 這種格式。`);
+  }
+  const start = String(profile.earliestStart ?? "");
+  const end = String(profile.latestEnd ?? "");
+  if (start && end && end <= start) errors.push("最晚結束時間必須晚於最早開始時間。");
   return errors;
 }

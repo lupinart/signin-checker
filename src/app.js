@@ -23,6 +23,8 @@ const elements = {
   declarationList: document.querySelector("#declaration-list"),
   completion: document.querySelector("#completion-callout"),
   download: document.querySelector("#download-report"),
+  ocrWarning: document.querySelector("#ocr-warning"),
+  ocrWarningText: document.querySelector("#ocr-warning-text"),
   newCheck: document.querySelector("#new-check"),
   newCheckTop: document.querySelector("#new-check-top"),
   profileVersion: document.querySelector("#profile-version"),
@@ -210,15 +212,21 @@ function renderDeclarations(declarations) {
 }
 
 async function showResults(sheet, source) {
-  const profile = findProfile(state.profiles, sheet) ?? state.profiles[0];
-  if (!profile) throw new Error("找不到可用的計畫規則，請聯絡管理者。");
+  if (!state.profiles.length) throw new Error("找不到可用的計畫規則，請聯絡管理者。");
+  const matched = findProfile(state.profiles, sheet);
+  const profile = matched ?? (state.profiles.length === 1 ? state.profiles[0] : null);
+  if (!profile) {
+    const available = state.profiles.map((item) => `${item.planNumber}（${item.planName}）`).join("、");
+    throw new Error(`無法從文件辨識出對應的計畫，請確認簽到單上的計畫編號是否清楚。目前啟用中的計畫：${available}。`);
+  }
   state.sheet = sheet;
   state.currentProfile = profile;
   state.result = checkTimesheet(sheet, profile);
   const annotations = buildAnnotations(state.result.issues, sheet);
   renderIssues(annotations);
   renderDeclarations(state.result.declarations);
-  elements.profileVersion.textContent = `${profile.planName} · 規則版本 ${profile.version ?? 1}`;
+  elements.ocrWarning.hidden = true;
+  elements.profileVersion.textContent = `${profile.planName} · 規則版本 ${profile.version ?? 1}${matched ? "" : "（未能從文件對應計畫，暫以此計畫檢查）"}`;
   elements.annotatedDocument.replaceChildren();
   if (source.kind === "docx") await renderDocxSource(source.buffer, sheet, annotations);
   else await renderImageSource(source.url, annotations, source.lines);
@@ -240,6 +248,12 @@ async function handleDocx(file) {
   }
 }
 
+function friendlyError(message) {
+  const error = new Error(message);
+  error.friendly = true;
+  return error;
+}
+
 async function handleImage(file) {
   if (state.sourceUrl) URL.revokeObjectURL(state.sourceUrl);
   state.sourceUrl = URL.createObjectURL(file);
@@ -250,10 +264,19 @@ async function handleImage(file) {
       elements.ocrPercent.textContent = `${progress}%`;
       elements.ocrBar.style.setProperty("--progress-scale", String(progress / 100));
     });
-    const sheet = parseOcrText(recognized.text);
+    const workContents = [...new Set(state.profiles.flatMap((profile) => profile.allowedWorkContents ?? []))];
+    const sheet = parseOcrText(recognized.text, {}, { workContents });
+    if (!sheet.entries.length) {
+      throw friendlyError("照片中沒有辨識出任何工作列，可能是角度、光線或手寫較難辨識。請正面重拍清楚的照片，或改用 Word 檔（最準確）。");
+    }
     await showResults(sheet, { kind: "image", url: state.sourceUrl, lines: recognized.lines });
+    const confidence = Math.round(recognized.confidence ?? 0);
+    elements.ocrWarningText.textContent = confidence < 70
+      ? `本次辨識信心只有約 ${confidence}%，照片內容很可能有辨識錯誤。請逐格與原件核對；若結果明顯不對，建議改用 Word 檔。`
+      : `照片辨識（信心約 ${confidence}%）仍可能看錯手寫字，請逐格與原件核對，必要時改用 Word 檔。`;
+    elements.ocrWarning.hidden = false;
   } catch (error) {
-    setStatus(`照片辨識未完成：${error.message}。請換一張清楚、正面的照片，或改用 Word。`, "error");
+    setStatus(error.friendly ? error.message : `照片辨識未完成：${error.message}。請換一張清楚、正面的照片，或改用 Word。`, "error");
   } finally {
     elements.ocrProgress.hidden = true;
   }
@@ -294,6 +317,7 @@ function clearAll() {
   state.currentProfile = null;
   elements.docxInput.value = "";
   elements.imageInput.value = "";
+  elements.ocrWarning.hidden = true;
   elements.resultsPanel.hidden = true;
   elements.annotatedDocument.replaceChildren();
   elements.clearButton.hidden = true;

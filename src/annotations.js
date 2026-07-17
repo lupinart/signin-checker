@@ -12,7 +12,8 @@ function valuesForField(sheet, field, entryIds = []) {
     studentId: sheet.studentId,
     phone: sheet.phone,
     totalHours: sheet.claimedTotalHours,
-    totalPay: sheet.claimedTotalPay
+    totalPay: sheet.claimedTotalPay,
+    footerSignature: sheet.footerSignature
   };
   if (field in topLevel) return [String(topLevel[field] ?? "")].filter(Boolean);
 
@@ -63,7 +64,8 @@ export function findAnnotationTarget(candidates, annotation) {
     studentId: ["學號"],
     phone: ["聯絡電話"],
     totalHours: ["計酬基準", "小時"],
-    totalPay: ["金額", "元"]
+    totalPay: ["金額", "元"],
+    footerSignature: ["簽名"]
   }[annotation.field];
   if (labelled) {
     const semanticMatch = candidates.find((candidate) => {
@@ -151,7 +153,7 @@ function fallbackBox(annotation) {
   const firstEntry = Number(annotation.entryIds[0] ?? 1);
   const x = { date: 10, time: 23, hours: 44, pay: 54, location: 63, workContent: 80, signature: 94 }[annotation.field] ?? 8;
   const width = { time: 20, location: 22, workContent: 18 }[annotation.field] ?? 13;
-  const metadataY = { planName: 7, unit: 12, planNumber: 17, name: 20, department: 20, studentId: 23, phone: 23, totalHours: 86, totalPay: 86 }[annotation.field];
+  const metadataY = { planName: 7, unit: 12, planNumber: 17, name: 20, department: 20, studentId: 23, phone: 23, totalHours: 86, totalPay: 86, footerSignature: 92 }[annotation.field];
   return { left: x, top: metadataY ?? Math.min(78, 28 + (firstEntry - 1) * 8), width, height: 6 };
 }
 

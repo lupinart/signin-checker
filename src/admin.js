@@ -1,4 +1,4 @@
-import { DEFAULT_PROFILES, validateProfile } from "./profiles.js";
+import { DEFAULT_PROFILES, normalizeDateText, validateProfile } from "./profiles.js";
 import {
   cloudConfigured,
   getSession,
@@ -100,10 +100,12 @@ function fillForm(profile) {
   setFormValue("blockedDates", (profile.blockedDates ?? []).join("\n"));
   setFormValue("note", profile.note);
   elements.editorTitle.textContent = profile.version ? "編輯規則" : "新增計畫";
-  elements.editorVersion.textContent = profile.version ? `目前版本 ${profile.version} · ${profile.updatedAt ?? "尚無更新時間"}` : "儲存後建立第一個版本";
+  elements.editorVersion.textContent = profile.version ? `目前版本 ${profile.version} · ${profile.updatedAt ?? "尚無更新時間"}` : "儲存後建立第一個版本，儲存後學生頁即套用";
   elements.deactivate.hidden = !profile.version;
+  elements.deactivate.textContent = profile.active === false ? "重新啟用計畫" : "停用計畫";
   elements.saveStatus.textContent = "";
   showErrors([]);
+  updateListSelection();
 }
 
 function readForm() {
@@ -119,7 +121,7 @@ function readForm() {
     earliestStart: elements.form.elements.earliestStart.value,
     latestEnd: elements.form.elements.latestEnd.value,
     allowedWeekdays: [...elements.form.querySelectorAll('input[name="allowedWeekdays"]:checked')].map((input) => Number(input.value)),
-    blockedDates: lines(elements.form.elements.blockedDates.value),
+    blockedDates: lines(elements.form.elements.blockedDates.value).map((value) => normalizeDateText(value) ?? value),
     location: {
       schoolOnly: elements.form.elements.schoolOnly.checked,
       requireRoom: elements.form.elements.requireRoom.checked,
@@ -133,16 +135,30 @@ function readForm() {
   };
 }
 
+function updateListSelection() {
+  for (const button of elements.profileList.querySelectorAll("button")) {
+    button.dataset.selected = button.dataset.profileId === state.current?.id ? "true" : "false";
+  }
+}
+
 function renderList() {
   elements.profileList.replaceChildren();
   for (const profile of state.profiles) {
     const button = document.createElement("button");
-    button.className = "button button--quiet";
+    button.className = "button button--quiet admin-list__item";
     button.type = "button";
-    button.textContent = `${profile.active === false ? "已停用 · " : ""}${profile.planNumber} · ${profile.planName}`;
+    button.dataset.profileId = profile.id;
+    const title = document.createElement("span");
+    title.textContent = `${profile.planNumber} · ${profile.planName}`;
+    const meta = document.createElement("small");
+    meta.className = "admin-list__meta";
+    meta.textContent = `${profile.active === false ? "已停用" : "已啟用"} · 版本 ${profile.version ?? 1}`;
+    if (profile.active === false) button.dataset.inactive = "true";
+    button.append(title, meta);
     button.addEventListener("click", () => fillForm(profile));
     elements.profileList.append(button);
   }
+  updateListSelection();
 }
 
 async function refresh(preferredId) {
@@ -203,10 +219,20 @@ elements.form.addEventListener("submit", async (event) => {
 });
 
 elements.deactivate.addEventListener("click", async () => {
-  if (!state.current) return;
-  const saved = await saveProfile({ ...readForm(), active: false });
-  await refresh(saved.id);
-  elements.saveStatus.textContent = "計畫已停用；學生頁不會再載入這份規則。";
+  if (!state.current?.version) return;
+  const reactivating = state.current.active === false;
+  const verb = reactivating ? "重新啟用" : "停用";
+  const effect = reactivating ? "學生頁重新整理後會再載入這份規則。" : "學生頁重新整理後就不會再載入這份規則。";
+  if (!window.confirm(`確定要${verb}「${state.current.planName}」嗎？${effect}`)) return;
+  try {
+    const saved = await saveProfile({ ...state.current, active: reactivating });
+    await refresh(saved.id);
+    elements.saveStatus.textContent = `計畫已${verb}；${effect}`;
+    elements.saveStatus.dataset.tone = "success";
+  } catch (error) {
+    elements.saveStatus.textContent = error.message;
+    elements.saveStatus.dataset.tone = "error";
+  }
 });
 
 elements.logout.addEventListener("click", async () => {
