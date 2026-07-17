@@ -1,0 +1,64 @@
+:root {
+  --color-paper: oklch(98% 0.006 245);
+  --color-paper-2: oklch(95% 0.009 245);
+  --color-paper-3: oklch(91% 0.012 245);
+  --color-ink: oklch(21% 0.028 252);
+  --color-ink-2: oklch(31% 0.026 252);
+  --color-neutral: oklch(43% 0.022 252);
+  --color-muted: oklch(48% 0.018 252);
+  --color-rule: oklch(81% 0.015 245);
+  --color-rule-2: oklch(70% 0.02 245);
+  --color-accent: oklch(38% 0.12 252);
+  --color-accent-ink: oklch(98% 0.006 245);
+  --color-focus: oklch(55% 0.17 252);
+  --color-error: oklch(47% 0.17 28);
+  --color-error-paper: oklch(95% 0.025 28);
+  --color-review: oklch(48% 0.12 67);
+  --color-review-paper: oklch(95% 0.035 76);
+  --color-tip: oklch(39% 0.09 162);
+  --color-tip-paper: oklch(95% 0.025 162);
+  --color-shadow: oklch(20% 0.02 252 / 0.08);
+  --color-overlay: oklch(18% 0.02 252 / 0.58);
+
+  --font-display: "Noto Serif TC", ui-serif, serif;
+  --font-body: "Noto Sans TC", ui-sans-serif, sans-serif;
+
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-md: 1.25rem;
+  --text-lg: 1.5625rem;
+  --text-xl: 1.953rem;
+  --text-2xl: 2.441rem;
+  --text-display: clamp(2.2rem, 5vw, 4.25rem);
+
+  --space-3xs: 0.125rem;
+  --space-2xs: 0.25rem;
+  --space-xs: 0.5rem;
+  --space-sm: 0.75rem;
+  --space-md: 1rem;
+  --space-lg: 1.5rem;
+  --space-xl: 2.5rem;
+  --space-2xl: 4rem;
+  --space-3xl: 6rem;
+
+  --radius-sm: 0.375rem;
+  --radius-md: 0.625rem;
+  --radius-lg: 1rem;
+  --rule-thin: 1px;
+  --rule-strong: 2px;
+
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in: cubic-bezier(0.7, 0, 0.84, 0);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --dur-micro: 120ms;
+  --dur-short: 220ms;
+  --dur-long: 420ms;
+
+  --z-base: 1;
+  --z-raised: 10;
+  --z-dropdown: 100;
+  --z-sticky: 200;
+  --z-modal: 400;
+  --z-toast: 500;
+}

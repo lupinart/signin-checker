@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="description" content="管理工讀生簽到單的計畫檢查規則。">
+    <meta name="theme-color" content="#f7f9fc">
+    <title>管理規則｜簽到前</title>
+    <link rel="icon" href="./favicon.svg" type="image/svg+xml">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;800&family=Noto+Serif+TC:wght@700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="./styles.css">
+  </head>
+  <body>
+    <header class="shell nav-edge">
+      <a class="wordmark" href="./">簽到前</a>
+      <a class="nav-action" href="./">返回檢查</a>
+    </header>
+
+    <main class="shell">
+      <section class="intro" aria-labelledby="admin-title">
+        <h1 id="admin-title">管理計畫規則。</h1>
+        <div class="intro__copy">
+          <p>這裡只保存計畫名稱、編號、執行單位與檢查條件，不接收學生文件、照片或辨識結果。</p>
+          <p class="privacy-line">私人資料不會進入規則資料庫。</p>
+        </div>
+      </section>
+
+      <section class="panel" id="login-panel" hidden>
+        <div class="panel__header"><h2>管理者登入</h2></div>
+        <form class="panel__body" id="login-form">
+          <div class="field-grid field-grid--2">
+            <div class="field">
+              <label for="login-email">電子郵件</label>
+              <input class="input" id="login-email" name="email" type="email" autocomplete="username" required>
+            </div>
+            <div class="field">
+              <label for="login-password">密碼</label>
+              <input class="input" id="login-password" name="password" type="password" autocomplete="current-password" required>
+            </div>
+          </div>
+          <div class="actions"><button class="button button--primary" type="submit">登入管理</button></div>
+          <p class="status-line" id="login-status" role="status" aria-live="polite"></p>
+        </form>
+      </section>
+
+      <div class="admin-layout" id="admin-layout" hidden>
+        <aside class="panel">
+          <div class="panel__header">
+            <div><h2>計畫</h2><p class="helper" id="storage-mode"></p></div>
+            <button class="button button--quiet" id="new-profile" type="button">新增</button>
+          </div>
+          <div class="panel__body">
+            <div class="admin-list" id="profile-list"></div>
+            <button class="button button--quiet" id="logout-button" type="button" hidden>登出</button>
+          </div>
+        </aside>
+
+        <form class="panel" id="profile-form" novalidate>
+          <div class="panel__header">
+            <div><h2 id="editor-title">編輯規則</h2><p class="helper" id="editor-version"></p></div>
+            <label class="switch-row" for="active"><span>啟用</span><input id="active" name="active" type="checkbox"></label>
+          </div>
+          <div class="panel__body">
+            <input id="profile-id" name="id" type="hidden">
+            <div class="field-grid field-grid--3">
+              <div class="field"><label for="admin-plan-name">計畫名稱</label><input class="input" id="admin-plan-name" name="planName" required></div>
+              <div class="field"><label for="admin-plan-number">計畫編號</label><input class="input" id="admin-plan-number" name="planNumber" required></div>
+              <div class="field"><label for="admin-unit">執行單位</label><input class="input" id="admin-unit" name="unit" required></div>
+            </div>
+
+            <fieldset class="field">
+              <legend class="field__label">允許工作星期</legend>
+              <div class="tag-list" id="weekday-options">
+                <label class="tag"><input type="checkbox" name="allowedWeekdays" value="1"> 星期一</label>
+                <label class="tag"><input type="checkbox" name="allowedWeekdays" value="2"> 星期二</label>
+                <label class="tag"><input type="checkbox" name="allowedWeekdays" value="3"> 星期三</label>
+                <label class="tag"><input type="checkbox" name="allowedWeekdays" value="4"> 星期四</label>
+                <label class="tag"><input type="checkbox" name="allowedWeekdays" value="5"> 星期五</label>
+                <label class="tag"><input type="checkbox" name="allowedWeekdays" value="6"> 星期六</label>
+                <label class="tag"><input type="checkbox" name="allowedWeekdays" value="0"> 星期日</label>
+              </div>
+            </fieldset>
+
+            <div class="field-grid field-grid--3">
+              <div class="field"><label for="hourly-rate">時薪</label><input class="input" id="hourly-rate" name="hourlyRate" type="number" min="1" step="1" required></div>
+              <div class="field"><label for="earliest-start">最早開始</label><input class="input" id="earliest-start" name="earliestStart" type="time"></div>
+              <div class="field"><label for="latest-end">最晚結束</label><input class="input" id="latest-end" name="latestEnd" type="time"></div>
+            </div>
+
+            <div class="field-grid field-grid--2">
+              <label class="switch-row" for="school-only"><span><strong>限校內工作地點</strong><br><small>關閉後不判定校外地點錯誤</small></span><input id="school-only" name="schoolOnly" type="checkbox"></label>
+              <label class="switch-row" for="require-room"><span><strong>要求研究室房號</strong><br><small>地點必須包含數字房號</small></span><input id="require-room" name="requireRoom" type="checkbox"></label>
+            </div>
+
+            <div class="field"><label for="location-prompt">工作地點提示</label><input class="input" id="location-prompt" name="locationPrompt"></div>
+            <div class="field"><label for="required-location-keywords">校內地點必要文字</label><textarea id="required-location-keywords" name="requiredKeywords"></textarea><small>每行一個；符合其中一個才通過。例如本專案填「研究室」。留空則不檢查。</small></div>
+            <div class="field"><label for="forbidden-keywords">禁止地點關鍵字</label><textarea id="forbidden-keywords" name="forbiddenKeywords"></textarea><small>每行一個，例如「家裡」。</small></div>
+            <div class="field"><label for="sample-values">範例地點文字</label><textarea id="sample-values" name="sampleValues"></textarea><small>學生填寫相同文字時，要求再次確認是否照抄。</small></div>
+            <div class="field"><label for="work-contents">允許的工作內容</label><textarea id="work-contents" name="allowedWorkContents"></textarea><small>每行一個；全部留空時改為人工確認。</small></div>
+            <div class="field"><label for="blocked-dates">休假／停班日期</label><textarea id="blocked-dates" name="blockedDates"></textarea><small>每行一個完整日期，例如 2026-07-17。</small></div>
+            <div class="field"><label for="profile-note">補充提醒</label><textarea id="profile-note" name="note"></textarea></div>
+
+            <div class="callout callout--error" id="profile-errors" hidden role="alert"></div>
+            <div class="actions">
+              <button class="button button--primary" id="save-profile" type="submit">儲存規則</button>
+              <button class="button button--danger" id="delete-profile" type="button">停用計畫</button>
+            </div>
+            <p class="status-line" id="save-status" role="status" aria-live="polite"></p>
+          </div>
+        </form>
+      </div>
+    </main>
+
+    <footer class="shell foot-line">
+      <p>簽到前 · 規則管理</p>
+      <p>學生私人資料不會出現在這裡。</p>
+    </footer>
+
+    <script type="module" src="./src/admin.js"></script>
+  </body>
+</html>

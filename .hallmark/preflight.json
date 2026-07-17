@@ -1,0 +1,8 @@
+{
+  "date": "2026-07-17",
+  "framework": "Vanilla HTML + Vite",
+  "fontStack": "Noto Serif TC + Noto Sans TC",
+  "palette": "OKLCH token system",
+  "motion": "motion-cut with functional progress only",
+  "spacing": "4pt scale"
+}

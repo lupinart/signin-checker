@@ -1,0 +1,49 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+
+import { parseOcrText } from "../src/ocr.js";
+
+test("turns clean OCR lines into editable timesheet data", () => {
+  const text = `
+    計畫名稱：A82 發展雲端知識體系計畫
+    執行單位：數位教育發展處數位課程發展組
+    計畫編號：115609782
+    1 7/1 9:00 12:00 3 588 維澈樓312研究室 課程字幕製作
+    2 7/1 13:00 16:00 3 588 維澈樓312研究室 課程字幕編輯
+    計酬基準 196 元/時 X 6 小時 金額 1176 元
+  `;
+
+  const result = parseOcrText(text, { year: 2026, month: 7 });
+
+  assert.equal(result.planName, "A82 發展雲端知識體系計畫");
+  assert.equal(result.planNumber, "115609782");
+  assert.equal(result.unit, "數位教育發展處數位課程發展組");
+  assert.equal(result.entries.length, 2);
+  assert.equal(result.entries[1].start, "13:00");
+  assert.equal(result.entries[1].location, "維澈樓312研究室");
+  assert.equal(result.entries[1].workContent, "課程字幕編輯");
+  assert.equal(result.claimedTotalHours, 6);
+  assert.equal(result.claimedTotalPay, 1176);
+});
+
+test("keeps uncertain OCR lines for manual review instead of inventing rows", () => {
+  const result = parseOcrText("日期糊掉了 研究室 9點到？", { year: 2026, month: 7 });
+
+  assert.equal(result.entries.length, 0);
+  assert.match(result.rawText, /日期糊掉了/);
+});
+
+test("tolerates spaces inserted between Chinese characters by OCR", () => {
+  const text = `
+    計 畫 名 稱：A82 發展雲端知識體系計畫
+    執 行 單 位：數位教育發展處數位課程發展組
+    計 畫 編 號：115609782
+    1 7/1 09:00 12:00 3 588 維 澈 樓 312 研 究 室 課 程 字 幕 製 作
+  `;
+
+  const result = parseOcrText(text, { year: 2026, month: 7 });
+
+  assert.equal(result.planNumber, "115609782");
+  assert.equal(result.entries[0].location, "維澈樓312研究室");
+  assert.equal(result.entries[0].workContent, "課程字幕製作");
+});
