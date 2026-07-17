@@ -13,16 +13,15 @@
     <link rel="stylesheet" href="./styles.css">
   </head>
   <body>
-    <header class="shell nav-edge">
+    <header class="shell nav-edge nav-edge--student">
       <a class="wordmark" href="./">簽到前</a>
-      <a class="nav-action" href="./admin.html">管理規則</a>
     </header>
 
     <main class="shell">
-      <section class="intro" aria-labelledby="page-title">
-        <h1 id="page-title">先檢查，再送出。</h1>
+      <section class="intro intro--student" aria-labelledby="page-title">
+        <h1 id="page-title">上傳簽到單，先自己檢查。</h1>
         <div class="intro__copy">
-          <p>選擇 Word 簽到單或直接拍照。系統會先讓你確認辨識內容，再檢查工時、休息、日期、地點、工作內容與金額。</p>
+          <p>上傳 Word 或直接拍照，確認辨識內容後，再檢查工時、休息、日期、地點、工作內容與金額。</p>
           <p class="privacy-line">你的文件、照片與辨識文字不會離開這台裝置。</p>
           <div class="manual-warning" role="note">
             <strong>人工檢查不可省略</strong>
@@ -31,61 +30,53 @@
         </div>
       </section>
 
-      <div class="workbench">
-        <aside class="rail" aria-label="檢查進度">
-          <section class="panel">
-            <div class="panel__body">
-              <ol class="step-list" id="step-list">
-                <li aria-current="step"><span data-step-marker>1</span><span><strong>選擇檔案</strong><br>DOCX 或照片</span></li>
-                <li><span data-step-marker>2</span><span><strong>確認辨識</strong><br>修正日期與時間</span></li>
-                <li><span data-step-marker>3</span><span><strong>檢查規則</strong><br>找出需要修改之處</span></li>
-                <li><span data-step-marker>4</span><span><strong>人工確認</strong><br>確認地點與簽章</span></li>
-              </ol>
-            </div>
-          </section>
+      <section class="panel upload-stage" id="upload-stage" aria-labelledby="upload-title">
+        <div class="panel__header upload-stage__head">
+          <div>
+            <h2 id="upload-title">上傳簽到單</h2>
+            <p class="helper">檔案只在這個瀏覽器分頁中處理，上傳後會在下方展開。</p>
+          </div>
+        </div>
+        <div class="panel__body upload-stage__body">
+          <ol class="step-list" id="step-list" aria-label="檢查流程">
+            <li aria-current="step"><span data-step-marker>1</span><strong>上傳</strong></li>
+            <li><span data-step-marker>2</span><strong>核對</strong></li>
+            <li><span data-step-marker>3</span><strong>檢查</strong></li>
+            <li><span data-step-marker>4</span><strong>人工</strong></li>
+          </ol>
 
-          <section class="panel">
-            <div class="panel__body">
-              <div class="field">
-                <label for="period">簽到年月</label>
-                <input class="input" id="period" name="period" type="month" value="2026-07">
-                <small>用來把 7/1 轉為完整日期。</small>
-              </div>
-              <div class="upload-zone" id="upload-zone">
-                <div>
-                  <h3>選擇簽到單</h3>
-                  <p class="helper">支援 .docx、JPG、PNG、HEIC（依瀏覽器支援）。</p>
-                </div>
-                <div class="upload-actions">
-                  <label class="file-label file-label--primary" for="docx-input">選 Word</label>
-                  <input class="native-file" id="docx-input" type="file" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document">
-                  <label class="file-label" for="image-input">拍照／選照片</label>
-                  <input class="native-file" id="image-input" type="file" accept="image/*" capture="environment">
-                </div>
-                <p class="status-line" id="file-status" role="status" aria-live="polite">尚未選擇檔案。</p>
-                <div class="progress" id="ocr-progress" hidden>
-                  <span>正在本機辨識照片：<strong id="ocr-percent">0%</strong></span>
-                  <div class="progress__track" aria-hidden="true"><div class="progress__bar" id="ocr-bar"></div></div>
-                </div>
-              </div>
-              <div class="source-preview" id="source-preview" hidden></div>
-              <button class="button button--quiet" id="clear-button" type="button" disabled>清除本機資料</button>
+          <div class="upload-stage__controls">
+            <div class="field upload-period">
+              <label for="period">簽到年月</label>
+              <input class="input" id="period" name="period" type="month" value="2026-07">
+              <small>用來把表上的 7/1 轉成完整日期。</small>
             </div>
-          </section>
-        </aside>
-
-        <div class="workspace">
-          <section class="panel" id="empty-panel">
-            <div class="empty-state">
-              <div class="empty-state__mark" aria-hidden="true"></div>
+            <div class="upload-zone" id="upload-zone">
               <div>
-                <h2>文件會在這裡展開</h2>
-                <p>先從左側選擇 Word 或照片。檔案只會在這個瀏覽器分頁中處理。</p>
+                <h3>選擇檔案</h3>
+                <p class="helper">支援 DOCX、JPG、PNG、HEIC（依瀏覽器支援）。</p>
+              </div>
+              <div class="upload-actions">
+                <label class="file-label file-label--primary" for="docx-input">上傳 Word</label>
+                <input class="native-file" id="docx-input" type="file" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document">
+                <label class="file-label" for="image-input">拍照／選照片</label>
+                <input class="native-file" id="image-input" type="file" accept="image/*" capture="environment">
+              </div>
+              <p class="status-line" id="file-status" role="status" aria-live="polite">尚未選擇檔案。</p>
+              <div class="progress" id="ocr-progress" hidden>
+                <span>正在本機辨識照片：<strong id="ocr-percent">0%</strong></span>
+                <div class="progress__track" aria-hidden="true"><div class="progress__bar" id="ocr-bar"></div></div>
               </div>
             </div>
-          </section>
+          </div>
+          <div class="source-preview" id="source-preview" hidden></div>
+          <button class="button button--quiet clear-button" id="clear-button" type="button" hidden disabled>清除這份資料</button>
+        </div>
+      </section>
 
-          <form class="panel" id="review-panel" hidden novalidate>
+      <div class="workspace">
+
+        <form class="panel" id="review-panel" hidden novalidate>
             <div class="panel__header">
               <div>
                 <h2>確認辨識內容</h2>
@@ -156,9 +147,9 @@
                 <button class="button button--primary" id="check-button" type="submit">開始檢查</button>
               </div>
             </div>
-          </form>
+        </form>
 
-          <section class="panel" id="results-panel" hidden aria-labelledby="results-title">
+        <section class="panel" id="results-panel" hidden aria-labelledby="results-title">
             <div class="panel__header">
               <div>
                 <h2 id="results-title">檢查結果</h2>
@@ -187,8 +178,7 @@
                 <button class="button button--quiet" id="new-check" type="button">檢查另一份</button>
               </div>
             </div>
-          </section>
-        </div>
+        </section>
       </div>
     </main>
 

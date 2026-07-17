@@ -1,6 +1,13 @@
 [
   {
     "date": "2026-07-17",
+    "macrostructure": "Single-task Intake",
+    "theme": "Quiet",
+    "enrichment": "none",
+    "brief": "手機優先、上傳即第一操作的學生簽到單檢查頁"
+  },
+  {
+    "date": "2026-07-17",
     "macrostructure": "Workbench",
     "theme": "Quiet",
     "enrichment": "none",

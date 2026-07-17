@@ -16,7 +16,7 @@ const elements = {
   ocrBar: document.querySelector("#ocr-bar"),
   sourcePreview: document.querySelector("#source-preview"),
   clearButton: document.querySelector("#clear-button"),
-  emptyPanel: document.querySelector("#empty-panel"),
+  uploadStage: document.querySelector("#upload-stage"),
   reviewPanel: document.querySelector("#review-panel"),
   resultsPanel: document.querySelector("#results-panel"),
   sourceKind: document.querySelector("#source-kind"),
@@ -162,7 +162,6 @@ function selectProfile(sheet) {
 function showReview(sheet, sourceKind) {
   state.sheet = sheet;
   state.sourceKind = sourceKind;
-  elements.emptyPanel.hidden = true;
   elements.resultsPanel.hidden = true;
   elements.reviewPanel.hidden = false;
   elements.sourceKind.textContent = sourceKind === "docx" ? "Word 本機解析" : "照片本機 OCR";
@@ -175,6 +174,7 @@ function showReview(sheet, sourceKind) {
   elements.rawWrap.hidden = sourceKind !== "image";
   setValue(elements.rawText, sheet.rawText);
   selectProfile(sheet);
+  elements.clearButton.hidden = false;
   elements.clearButton.disabled = false;
   setStep(2);
   elements.reviewPanel.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -411,9 +411,9 @@ function clearAll() {
   elements.reviewPanel.reset();
   elements.reviewPanel.hidden = true;
   elements.resultsPanel.hidden = true;
-  elements.emptyPanel.hidden = false;
   elements.rawWrap.hidden = true;
   elements.entryList.replaceChildren();
+  elements.clearButton.hidden = true;
   elements.clearButton.disabled = true;
   setStatus("尚未選擇檔案。");
   setStep(1);
@@ -422,7 +422,10 @@ function clearAll() {
 elements.docxInput.addEventListener("change", (event) => event.target.files[0] && handleDocx(event.target.files[0]));
 elements.imageInput.addEventListener("change", (event) => event.target.files[0] && handleImage(event.target.files[0]));
 elements.clearButton.addEventListener("click", clearAll);
-elements.newCheck.addEventListener("click", clearAll);
+elements.newCheck.addEventListener("click", () => {
+  clearAll();
+  elements.uploadStage.scrollIntoView({ behavior: "smooth", block: "start" });
+});
 elements.backToReview.addEventListener("click", () => {
   elements.resultsPanel.hidden = true;
   elements.reviewPanel.hidden = false;
