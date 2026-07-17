@@ -2,7 +2,7 @@ import { annotateImage, annotateRenderedDocx, buildAnnotations } from "./annotat
 import { parseDocx } from "./docx.js";
 import { parseOcrText, recognizeImage } from "./ocr.js";
 import { findProfile } from "./profiles.js";
-import { buildAnonymousReport, summarizeIssues } from "./report.js";
+import { summarizeIssues } from "./report.js";
 import { checkTimesheet } from "./rules.js";
 import { loadProfiles } from "./store.js";
 
@@ -20,9 +20,7 @@ const elements = {
   annotatedDocument: document.querySelector("#annotated-document"),
   issueSummary: document.querySelector("#issue-summary"),
   issueList: document.querySelector("#issue-list"),
-  declarationList: document.querySelector("#declaration-list"),
-  completion: document.querySelector("#completion-callout"),
-  download: document.querySelector("#download-report"),
+  manualCheckList: document.querySelector("#manual-check-list"),
   ocrWarning: document.querySelector("#ocr-warning"),
   ocrWarningText: document.querySelector("#ocr-warning-text"),
   newCheck: document.querySelector("#new-check"),
@@ -185,30 +183,13 @@ async function renderImageSource(url, annotations, lines) {
   annotateImage(frame, annotations, lines, image.naturalWidth, image.naturalHeight);
 }
 
-function updateCompletion() {
-  const boxes = [...elements.declarationList.querySelectorAll("input[type=checkbox]")];
-  const complete = boxes.length > 0 && boxes.every((box) => box.checked);
-  elements.download.disabled = !complete;
-  elements.completion.querySelector("strong").textContent = complete ? "人工確認已完成" : "尚未完成人工確認";
-  elements.completion.querySelector("span").textContent = complete ? "你可以下載不含個資的檢查清單。" : "勾選全部項目後，再下載匿名檢查清單。";
-  setStep(complete ? 3 : 2);
-}
-
-function renderDeclarations(declarations) {
-  elements.declarationList.replaceChildren();
+function renderManualChecks(declarations) {
+  elements.manualCheckList.replaceChildren();
   for (const declaration of declarations) {
-    const label = document.createElement("label");
-    label.className = "check-row";
-    const checkbox = document.createElement("input");
-    checkbox.type = "checkbox";
-    checkbox.value = declaration.code;
-    checkbox.addEventListener("change", updateCompletion);
-    const text = document.createElement("span");
-    text.textContent = declaration.label;
-    label.append(checkbox, text);
-    elements.declarationList.append(label);
+    const item = document.createElement("li");
+    item.textContent = declaration.label;
+    elements.manualCheckList.append(item);
   }
-  updateCompletion();
 }
 
 async function showResults(sheet, source) {
@@ -224,15 +205,16 @@ async function showResults(sheet, source) {
   state.result = checkTimesheet(sheet, profile);
   const annotations = buildAnnotations(state.result.issues, sheet);
   renderIssues(annotations);
-  renderDeclarations(state.result.declarations);
+  renderManualChecks(state.result.declarations);
   elements.ocrWarning.hidden = true;
-  elements.profileVersion.textContent = `${profile.planName} · 規則版本 ${profile.version ?? 1}${matched ? "" : "（未能從文件對應計畫，暫以此計畫檢查）"}`;
+  elements.profileVersion.textContent = matched ? "" : `未能從文件對應計畫，暫以「${profile.planName}」的規則檢查`;
   elements.annotatedDocument.replaceChildren();
   if (source.kind === "docx") await renderDocxSource(source.buffer, sheet, annotations);
   else await renderImageSource(source.url, annotations, source.lines);
   elements.resultsPanel.hidden = false;
   elements.clearButton.hidden = false;
   elements.clearButton.disabled = false;
+  setStep(2);
   setStatus(`檢查完成，共有 ${annotations.length} 項提醒。請依編號核對。`, annotations.length ? "error" : "success");
   elements.resultsPanel.scrollIntoView({ behavior: "smooth", block: "start" });
 }
@@ -282,33 +264,6 @@ async function handleImage(file) {
   }
 }
 
-function reportMarkdown(report) {
-  const tone = { error: "必須修改", review: "需要確認" };
-  return [
-    "# 簽到單匿名檢查清單", "",
-    `- 計畫：${report.profile.planName}`,
-    `- 計畫編號：${report.profile.planNumber}`,
-    `- 規則版本：${report.profile.version}`,
-    `- 產生時間：${report.generatedAt}`,
-    `- 必須修改：${report.summary.error}`,
-    `- 需要確認：${report.summary.review}`, "", "## 檢查問題", "",
-    ...report.issues.map((issue, index) => `${index + 1}. [${tone[issue.severity]}] ${issue.message}${issue.entryIds.length ? `（第 ${issue.entryIds.join("、")} 列）` : ""}`),
-    "", "## 人工確認", "",
-    ...report.declarations.map((item) => `- [x] ${item.label}`), "", `> ${report.privacy}`, ""
-  ].join("\n");
-}
-
-function downloadReport() {
-  const report = buildAnonymousReport({ profile: state.currentProfile, sheet: state.sheet, result: state.result });
-  const blob = new Blob([reportMarkdown(report)], { type: "text/markdown;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = `簽到單檢查清單-${state.currentProfile.planNumber}.md`;
-  link.click();
-  URL.revokeObjectURL(url);
-}
-
 function clearAll() {
   if (state.sourceUrl) URL.revokeObjectURL(state.sourceUrl);
   state.sourceUrl = null;
@@ -336,7 +291,6 @@ elements.imageInput.addEventListener("change", (event) => event.target.files[0] 
 elements.clearButton.addEventListener("click", clearAll);
 elements.newCheck.addEventListener("click", startAnotherCheck);
 elements.newCheckTop.addEventListener("click", startAnotherCheck);
-elements.download.addEventListener("click", downloadReport);
 
 for (const eventName of ["dragenter", "dragover"]) {
   elements.uploadZone.addEventListener(eventName, (event) => {

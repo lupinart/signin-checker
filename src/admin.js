@@ -99,8 +99,17 @@ function fillForm(profile) {
   setFormValue("allowedWorkContents", (profile.allowedWorkContents ?? []).join("\n"));
   setFormValue("blockedDates", (profile.blockedDates ?? []).join("\n"));
   setFormValue("note", profile.note);
+  document.querySelector("#section-time").open =
+    (profile.blockedDates ?? []).length > 0 || Boolean(profile.earliestStart || profile.latestEnd);
+  document.querySelector("#section-location").open =
+    Boolean(profile.location?.schoolOnly || profile.location?.requireRoom)
+    || (profile.location?.requiredKeywords ?? []).length > 0
+    || (profile.location?.forbiddenKeywords ?? []).length > 0
+    || (profile.location?.sampleValues ?? []).length > 0;
+  document.querySelector("#section-content").open =
+    (profile.allowedWorkContents ?? []).length > 0 || Boolean(profile.note);
   elements.editorTitle.textContent = profile.version ? "編輯規則" : "新增計畫";
-  elements.editorVersion.textContent = profile.version ? `目前版本 ${profile.version} · ${profile.updatedAt ?? "尚無更新時間"}` : "儲存後建立第一個版本，儲存後學生頁即套用";
+  elements.editorVersion.textContent = profile.version ? `上次儲存：${savedAtText(profile)}` : "填好基本資料就能儲存；儲存後學生頁重新整理即套用";
   elements.deactivate.hidden = !profile.version;
   elements.deactivate.textContent = profile.active === false ? "重新啟用計畫" : "停用計畫";
   elements.saveStatus.textContent = "";
@@ -135,6 +144,14 @@ function readForm() {
   };
 }
 
+function savedAtText(profile) {
+  if (!profile.updatedAt) return "時間不明";
+  const saved = new Date(profile.updatedAt);
+  return Number.isNaN(saved.getTime())
+    ? "時間不明"
+    : saved.toLocaleString("zh-TW", { dateStyle: "short", timeStyle: "short", hour12: false });
+}
+
 function updateListSelection() {
   for (const button of elements.profileList.querySelectorAll("button")) {
     button.dataset.selected = button.dataset.profileId === state.current?.id ? "true" : "false";
@@ -152,7 +169,7 @@ function renderList() {
     title.textContent = `${profile.planNumber} · ${profile.planName}`;
     const meta = document.createElement("small");
     meta.className = "admin-list__meta";
-    meta.textContent = `${profile.active === false ? "已停用" : "已啟用"} · 版本 ${profile.version ?? 1}`;
+    meta.textContent = `${profile.active === false ? "已停用" : "已啟用"} · ${savedAtText(profile)}`;
     if (profile.active === false) button.dataset.inactive = "true";
     button.append(title, meta);
     button.addEventListener("click", () => fillForm(profile));
@@ -207,7 +224,7 @@ elements.form.addEventListener("submit", async (event) => {
   try {
     const saved = await saveProfile(profile);
     await refresh(saved.id);
-    elements.saveStatus.textContent = `已儲存規則版本 ${saved.version}。`;
+    elements.saveStatus.textContent = "已儲存，學生頁重新整理後生效。";
     elements.saveStatus.dataset.tone = "success";
   } catch (error) {
     elements.saveStatus.textContent = error.message;

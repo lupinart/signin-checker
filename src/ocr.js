@@ -101,58 +101,6 @@ export function parseOcrText(rawText, fallbackContext = {}, options = {}) {
   };
 }
 
-async function preprocessImage(image) {
-  if (typeof document === "undefined" || typeof createImageBitmap === "undefined") return image;
-  try {
-    const bitmap = await createImageBitmap(image);
-    const sourceWidth = bitmap.width;
-    const sourceHeight = bitmap.height;
-    const scale = Math.min(2.5, Math.max(1, 1800 / Math.min(sourceWidth, sourceHeight)));
-    const canvas = document.createElement("canvas");
-    canvas.width = Math.round(sourceWidth * scale);
-    canvas.height = Math.round(sourceHeight * scale);
-    const context = canvas.getContext("2d", { willReadFrequently: true });
-    context.imageSmoothingEnabled = true;
-    context.imageSmoothingQuality = "high";
-    context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-    bitmap.close();
-
-    const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
-    const { data } = imageData;
-    const histogram = new Uint32Array(256);
-    for (let index = 0; index < data.length; index += 4) {
-      const gray = Math.round(data[index] * 0.299 + data[index + 1] * 0.587 + data[index + 2] * 0.114);
-      data[index] = gray;
-      histogram[gray] += 1;
-    }
-
-    const pixels = data.length / 4;
-    let low = 0;
-    let high = 255;
-    let count = 0;
-    for (let level = 0; level < 256; level += 1) {
-      count += histogram[level];
-      if (count >= pixels * 0.02) { low = level; break; }
-    }
-    count = 0;
-    for (let level = 255; level >= 0; level -= 1) {
-      count += histogram[level];
-      if (count >= pixels * 0.02) { high = level; break; }
-    }
-    const range = Math.max(1, high - low);
-    for (let index = 0; index < data.length; index += 4) {
-      const stretched = Math.max(0, Math.min(255, Math.round(((data[index] - low) / range) * 255)));
-      data[index] = stretched;
-      data[index + 1] = stretched;
-      data[index + 2] = stretched;
-    }
-    context.putImageData(imageData, 0, 0);
-    return { canvas, scaleX: canvas.width / sourceWidth, scaleY: canvas.height / sourceHeight };
-  } catch {
-    return image;
-  }
-}
-
 export async function recognizeImage(image, onProgress = () => {}) {
   const { createWorker } = await import("tesseract.js");
   const worker = await createWorker(["chi_tra", "eng"], 1, {
@@ -161,20 +109,10 @@ export async function recognizeImage(image, onProgress = () => {}) {
     }
   });
   try {
-    await worker.setParameters({ preserve_interword_spaces: "1" });
-    const prepared = await preprocessImage(image);
-    const target = prepared.canvas ?? prepared;
-    const scaleX = prepared.scaleX ?? 1;
-    const scaleY = prepared.scaleY ?? 1;
-    const { data } = await worker.recognize(target, {}, { blocks: true });
+    const { data } = await worker.recognize(image, {}, { blocks: true });
     const lines = (data.blocks ?? []).flatMap((block) => (block.paragraphs ?? []))
       .flatMap((paragraph) => paragraph.lines ?? [])
-      .map((line) => ({
-        text: line.text ?? "",
-        bbox: line.bbox
-          ? { x0: line.bbox.x0 / scaleX, y0: line.bbox.y0 / scaleY, x1: line.bbox.x1 / scaleX, y1: line.bbox.y1 / scaleY }
-          : line.bbox
-      }));
+      .map((line) => ({ text: line.text ?? "", bbox: line.bbox }));
     return { text: data.text, confidence: data.confidence ?? 0, lines };
   } finally {
     await worker.terminate();

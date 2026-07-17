@@ -41,7 +41,6 @@
           <ol class="step-list" id="step-list" aria-label="檢查流程">
             <li aria-current="step"><span data-step-marker>1</span><strong>上傳</strong></li>
             <li><span data-step-marker>2</span><strong>看結果</strong></li>
-            <li><span data-step-marker>3</span><strong>人工確認</strong></li>
           </ol>
 
           <div class="upload-stage__controls">
@@ -97,21 +96,12 @@
                   <div class="issue-list" id="issue-list"></div>
                 </aside>
               </div>
-              <div class="manual-warning" role="note">
-                <strong>人工檢查不可省略</strong>
-                <span>檢查結果僅供提醒參考；即使顯示沒有錯誤，送件前仍須人工逐項核對。</span>
-              </div>
-              <section>
-                <h3>最後由你確認</h3>
-                <p class="helper">這些事情無法只靠文件文字自動判斷。</p>
-                <div class="checklist" id="declaration-list"></div>
+              <section class="final-warning" role="alert" aria-labelledby="final-warning-title">
+                <h3 id="final-warning-title">人工檢查不可省略</h3>
+                <p>下面這些事工具無法自動判斷，送出前請自己核對；沒有紅框不代表文件正確。</p>
+                <ul id="manual-check-list"></ul>
               </section>
-              <div class="callout" id="completion-callout">
-                <strong>尚未完成人工確認</strong>
-                <span>勾選全部項目後，再下載匿名檢查清單。</span>
-              </div>
               <div class="actions">
-                <button class="button button--primary" id="download-report" type="button" disabled>下載檢查清單</button>
                 <button class="button button--quiet" id="new-check" type="button">檢查另一份</button>
               </div>
             </div>

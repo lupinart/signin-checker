@@ -106,7 +106,7 @@ assert.match(await page.locator("#storage-mode").innerText(), /本機規則/);
 await page.locator("#school-only").uncheck();
 await page.locator("#save-profile").click();
 await page.locator("#save-status").waitFor({ state: "visible" });
-assert.match(await page.locator("#save-status").innerText(), /已儲存規則版本/);
+assert.match(await page.locator("#save-status").innerText(), /已儲存/);
 assert.equal(await page.locator("#school-only").isChecked(), false);
 await page.screenshot({ path: artifactPath("admin-desktop.png"), fullPage: true });
 
