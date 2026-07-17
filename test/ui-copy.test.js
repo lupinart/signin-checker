@@ -28,3 +28,11 @@ test("shows conclusions beside a numbered document annotation view without OCR t
   assert.match(html, /id="issue-list"/);
   assert.match(html, /文件上的號碼會對應右側的修改提醒/);
 });
+
+test("does not ask students for a month or show an unused suggestion category", async () => {
+  const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
+  const app = await readFile(new URL("../src/app.js", import.meta.url), "utf8");
+
+  assert.doesNotMatch(html, /id="period"|簽到年月|填寫建議/);
+  assert.doesNotMatch(app, /contextFromPeriod|elements\.period|填寫建議/);
+});

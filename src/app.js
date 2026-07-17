@@ -7,7 +7,6 @@ import { checkTimesheet } from "./rules.js";
 import { loadProfiles } from "./store.js";
 
 const elements = {
-  period: document.querySelector("#period"),
   docxInput: document.querySelector("#docx-input"),
   imageInput: document.querySelector("#image-input"),
   uploadZone: document.querySelector("#upload-zone"),
@@ -51,11 +50,6 @@ function setStep(step) {
   });
 }
 
-function contextFromPeriod() {
-  const [year, month] = elements.period.value.split("-").map(Number);
-  return { year: year || new Date().getFullYear(), month: month || new Date().getMonth() + 1 };
-}
-
 function issueCount(label, count, tone) {
   const box = document.createElement("div");
   box.className = `issue-count issue-count--${tone}`;
@@ -78,8 +72,7 @@ function renderIssues(annotations) {
   const summary = summarizeIssues(annotations);
   elements.issueSummary.replaceChildren(
     issueCount("必須修改", summary.error, "error"),
-    issueCount("需要確認", summary.review, "review"),
-    issueCount("填寫建議", summary.tip, "tip")
+    issueCount("需要確認", summary.review, "review")
   );
   elements.issueList.replaceChildren();
 
@@ -101,7 +94,7 @@ function renderIssues(annotations) {
     const copy = document.createElement("div");
     copy.className = "issue__copy";
     const title = document.createElement("strong");
-    title.textContent = annotation.severity === "error" ? "必須修改" : annotation.severity === "review" ? "需要確認" : "填寫建議";
+    title.textContent = annotation.severity === "error" ? "必須修改" : "需要確認";
     const message = document.createElement("span");
     message.textContent = annotation.message;
     copy.append(title, message);
@@ -134,18 +127,21 @@ function renderSheetFallback(sheet) {
   title.textContent = "計畫案工讀生及臨時工簽到單";
   const metadata = document.createElement("div");
   metadata.className = "document-metadata";
-  for (const [label, value] of [["計畫名稱", sheet.planName], ["執行單位", sheet.unit], ["計畫編號", sheet.planNumber]]) {
+  for (const [label, value] of [
+    ["計畫名稱", sheet.planName], ["執行單位", sheet.unit], ["計畫編號", sheet.planNumber],
+    ["姓名", sheet.name], ["學系", sheet.department], ["學號", sheet.studentId], ["聯絡電話", sheet.phone]
+  ]) {
     const line = document.createElement("p");
     line.append(`${label}：`, document.createTextNode(value ?? ""));
     metadata.append(line);
   }
   const table = document.createElement("table");
   const header = document.createElement("tr");
-  ["編號", "日期", "開始", "結束", "時數", "酬金", "工作地點", "工作內容"].forEach((value) => addCell(header, value, "th"));
+  ["編號", "日期", "開始", "結束", "時數", "酬金", "工作地點", "工作內容", "簽章"].forEach((value) => addCell(header, value, "th"));
   table.append(header);
   for (const entry of sheet.entries ?? []) {
     const row = document.createElement("tr");
-    [entry.id, entry.date, entry.start, entry.end, entry.hours, entry.pay, entry.location, entry.workContent].forEach((value) => addCell(row, value));
+    [entry.id, entry.date, entry.start, entry.end, entry.hours, entry.pay, entry.location, entry.workContent, entry.signature].forEach((value) => addCell(row, value));
     table.append(row);
   }
   const totals = document.createElement("p");
@@ -237,7 +233,7 @@ async function handleDocx(file) {
   setStatus(`正在本機解析並檢查 ${file.name}…`);
   try {
     const buffer = await file.arrayBuffer();
-    const sheet = await parseDocx(buffer, contextFromPeriod());
+    const sheet = await parseDocx(buffer);
     await showResults(sheet, { kind: "docx", buffer });
   } catch (error) {
     setStatus(error.message, "error");
@@ -254,7 +250,7 @@ async function handleImage(file) {
       elements.ocrPercent.textContent = `${progress}%`;
       elements.ocrBar.style.setProperty("--progress-scale", String(progress / 100));
     });
-    const sheet = parseOcrText(recognized.text, contextFromPeriod());
+    const sheet = parseOcrText(recognized.text);
     await showResults(sheet, { kind: "image", url: state.sourceUrl, lines: recognized.lines });
   } catch (error) {
     setStatus(`照片辨識未完成：${error.message}。請換一張清楚、正面的照片，或改用 Word。`, "error");
@@ -264,7 +260,7 @@ async function handleImage(file) {
 }
 
 function reportMarkdown(report) {
-  const tone = { error: "必須修改", review: "需要確認", tip: "填寫建議" };
+  const tone = { error: "必須修改", review: "需要確認" };
   return [
     "# 簽到單匿名檢查清單", "",
     `- 計畫：${report.profile.planName}`,

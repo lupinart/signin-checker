@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildAnnotations } from "../src/annotations.js";
+import { buildAnnotations, fieldColumnIndex, findAnnotationTarget } from "../src/annotations.js";
 
 const sheet = {
   planName: "測試計畫",
@@ -35,4 +35,22 @@ test("maps metadata and totals without an entry id", () => {
 
   assert.deepEqual(annotations[0].searchTexts, ["115000001"]);
   assert.deepEqual(annotations[1].searchTexts, ["1862"]);
+});
+
+test("finds total fields by their labels instead of matching an unrelated repeated number", () => {
+  const candidates = [
+    { textContent: "第 16 列" },
+    { textContent: "計酬基準 196 元／時 × 16 小時" },
+    { textContent: "金額：3,136 元" }
+  ];
+
+  assert.equal(findAnnotationTarget(candidates, { field: "totalHours", searchTexts: ["16"] }), candidates[1]);
+  assert.equal(findAnnotationTarget(candidates, { field: "totalPay", searchTexts: ["3136"] }), candidates[2]);
+});
+
+test("maps wage and signature fields after Word expands the merged time column", () => {
+  assert.equal(fieldColumnIndex("hours", 9), 4);
+  assert.equal(fieldColumnIndex("pay", 9), 5);
+  assert.equal(fieldColumnIndex("signature", 9), 8);
+  assert.equal(fieldColumnIndex("pay", 8), 4);
 });

@@ -41,6 +41,10 @@ function sheet(entries, overrides = {}) {
     planName: profile.planName,
     planNumber: profile.planNumber,
     unit: profile.unit,
+    name: "柯同學",
+    department: "企管碩一",
+    studentId: "114000001",
+    phone: "0912345678",
     entries,
     claimedTotalHours: entries.reduce((sum, item) => sum + Number(item.hours || 0), 0),
     claimedTotalPay: entries.reduce((sum, item) => sum + Number(item.pay || 0), 0),
@@ -92,6 +96,38 @@ test("recalculates row hours and pay", () => {
   assert.ok(codes(result).includes("TOTAL_PAY_MISMATCH"));
   assert.equal(result.calculated.totalHours, 3);
   assert.equal(result.calculated.totalPay, 588);
+  assert.match(result.issues.find((issue) => issue.code === "ROW_PAY_MISMATCH").message, /3 小時 × 時薪 196 元/);
+  assert.match(result.issues.find((issue) => issue.code === "TOTAL_PAY_MISMATCH").message, /合計 3 小時 × 時薪 196 元/);
+});
+
+test("treats blank row and total wages as errors", () => {
+  const result = checkTimesheet(sheet([
+    entry({ pay: "" })
+  ], { claimedTotalPay: "" }), profile);
+
+  assert.ok(codes(result).includes("ROW_PAY_MISMATCH"));
+  assert.ok(codes(result).includes("TOTAL_PAY_MISMATCH"));
+});
+
+test("requires personal fields and a signature on every work row", () => {
+  const result = checkTimesheet(sheet([
+    entry({ signature: "" })
+  ], { name: "", department: "", studentId: "", phone: "" }), profile);
+
+  assert.ok(codes(result).includes("NAME_REQUIRED"));
+  assert.ok(codes(result).includes("DEPARTMENT_REQUIRED"));
+  assert.ok(codes(result).includes("STUDENT_ID_REQUIRED"));
+  assert.ok(codes(result).includes("PHONE_REQUIRED"));
+  assert.ok(codes(result).includes("SIGNATURE_REQUIRED"));
+});
+
+test("asks for review when the written signature text differs from the name", () => {
+  const result = checkTimesheet(sheet([
+    entry({ signature: "陳同學" })
+  ]), profile);
+
+  assert.ok(codes(result).includes("SIGNATURE_NAME_MISMATCH"));
+  assert.match(result.declarations.find((item) => item.code === "SIGNATURES_COMPLETE").label, /本人手寫簽名.*姓名相同/);
 });
 
 test("flags blocked dates, weekends and late work", () => {

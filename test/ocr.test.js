@@ -47,3 +47,21 @@ test("tolerates spaces inserted between Chinese characters by OCR", () => {
   assert.equal(result.entries[0].location, "維澈樓312研究室");
   assert.equal(result.entries[0].workContent, "課程字幕製作");
 });
+
+test("infers a Gregorian date from the ROC year in photographed text", () => {
+  const result = parseOcrText(`
+    計畫案工讀生及臨時工簽到單（115 年 7 月）
+    1 7/1 09:00 12:00 3 588 維澈樓312研究室 課程字幕製作
+  `);
+
+  assert.equal(result.entries[0].date, "2026-07-01");
+  assert.equal(result.claimedTotalHours, "");
+  assert.equal(result.claimedTotalPay, "");
+});
+
+test("keeps a photographed row when the wage cell is blank", () => {
+  const result = parseOcrText("1 7/1 09:00 12:00 3 維澈樓312研究室 課程字幕製作", { year: 2026, month: 7 });
+
+  assert.equal(result.entries.length, 1);
+  assert.equal(result.entries[0].pay, "");
+});

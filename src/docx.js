@@ -1,4 +1,5 @@
 import { strFromU8, unzipSync } from "fflate";
+import { inferPeriod } from "./period.js";
 
 function decodeXml(value) {
   return value
@@ -63,6 +64,13 @@ function metadata(lines, label, nextLabel) {
   return (nextLabel ? after.split(nextLabel)[0] : after).replace(/^\s*[：:]\s*/, "").trim();
 }
 
+function personalValue(value, label, nextLabels) {
+  const compact = String(value).replaceAll(/\s+/g, "");
+  const next = nextLabels.join("|");
+  const match = new RegExp(`${label}[：:]?(.+?)(?=${next}|$)`).exec(compact);
+  return match ? match[1].replace(/^□?/, "").replace(/□$/, "") : "";
+}
+
 function workEntry(cells, context) {
   const id = numberValue(cells[0]);
   if (!id) return null;
@@ -74,9 +82,10 @@ function workEntry(cells, context) {
   let payCell;
   let locationCell;
   let workCell;
+  let signatureCell;
 
   if (cells.length >= 9) {
-    [, dateCell, startCell, endCell, hoursCell, payCell, locationCell, workCell] = cells;
+    [, dateCell, startCell, endCell, hoursCell, payCell, locationCell, workCell, signatureCell] = cells;
   } else if (cells.length >= 8) {
     const times = [...cells[2].matchAll(/\d{1,2}\s*[:：]\s*\d{2}/g)].map((match) => match[0]);
     dateCell = cells[1];
@@ -85,6 +94,7 @@ function workEntry(cells, context) {
     payCell = cells[4];
     locationCell = cells[5];
     workCell = cells[6];
+    signatureCell = cells[7];
   } else {
     return null;
   }
@@ -102,22 +112,26 @@ function workEntry(cells, context) {
     hours: numberValue(hoursCell),
     pay: optionalNumberValue(payCell),
     location: String(locationCell ?? "").trim(),
-    workContent: String(workCell ?? "").trim()
+    workContent: String(workCell ?? "").trim(),
+    signature: String(signatureCell ?? "").trim()
   };
 }
 
-export async function parseDocx(input, context) {
+export async function parseDocx(input, fallbackContext = {}) {
   const bytes = input instanceof Uint8Array ? input : new Uint8Array(input);
   const archive = unzipSync(bytes);
   const documentXml = archive["word/document.xml"];
   if (!documentXml) throw new Error("無法讀取 Word 文件內容，請確認檔案是有效的 DOCX。");
 
-  const xml = withoutTextBoxes(strFromU8(documentXml));
+  const rawXml = strFromU8(documentXml);
+  const context = inferPeriod(xmlText(rawXml), fallbackContext);
+  const xml = withoutTextBoxes(rawXml);
   const lines = paragraphs(xml);
   const entries = tableRows(xml)
     .map((cells) => workEntry(cells, context))
     .filter(Boolean);
   const completeText = lines.join(" ");
+  const personalText = xmlText(rawXml);
   const hoursMatch = /(?:X|×)\s*(\d+(?:\.\d+)?)\s*小時/i.exec(completeText);
   const payMatch = /金額\s*[:：]?\s*(\d[\d,]*(?:\.\d+)?)\s*元/.exec(completeText);
 
@@ -125,8 +139,12 @@ export async function parseDocx(input, context) {
     planName: metadata(lines, "計畫名稱", "二、"),
     planNumber: metadata(lines, "計畫編號", "四、"),
     unit: metadata(lines, "執行單位", "三、"),
+    name: personalValue(personalText, "姓名", ["學系", "學號", "聯絡電話"]),
+    department: personalValue(personalText, "學系", ["學號", "聯絡電話"]),
+    studentId: personalValue(personalText, "學號", ["校外人士", "聯絡電話"]),
+    phone: personalValue(personalText, "聯絡電話", ["編號", "工作日期"]),
     entries,
-    claimedTotalHours: hoursMatch ? Number(hoursMatch[1]) : entries.reduce((sum, item) => sum + item.hours, 0),
-    claimedTotalPay: payMatch ? numberValue(payMatch[1]) : entries.reduce((sum, item) => sum + item.pay, 0)
+    claimedTotalHours: hoursMatch ? Number(hoursMatch[1]) : "",
+    claimedTotalPay: payMatch ? numberValue(payMatch[1]) : ""
   };
 }

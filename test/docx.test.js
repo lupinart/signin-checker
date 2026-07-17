@@ -9,23 +9,25 @@ const cell = (value) => value?.raw
   : `<w:tc><w:p><w:r><w:t>${value}</w:t></w:r></w:p></w:tc>`;
 const row = (values) => `<w:tr>${values.map(cell).join("")}</w:tr>`;
 
-function docxFixture({ annotatedPay = false, secondPayValue = "588" } = {}) {
+function docxFixture({ annotatedPay = false, secondPayValue = "588", totals = true } = {}) {
   const secondPay = annotatedPay
     ? { raw: `<w:r><w:drawing><wps:txbx xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape"><w:txbxContent><w:p><w:r><w:t>❌ 連續4小時，1天不可超過8小時</w:t></w:r></w:p></w:txbxContent></wps:txbx></w:drawing></w:r><w:r><w:t>588</w:t></w:r>` }
     : secondPayValue;
   const xml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
     <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
       <w:body>
+        <w:p><w:r><w:t>計畫案工讀生及臨時工簽到單（115 年 7 月）</w:t></w:r></w:p>
         <w:p><w:r><w:t>一、計畫名稱：A82 發展雲端知識體系計畫</w:t></w:r></w:p>
         <w:p><w:r><w:t>二、執行單位：數位教育發展處數位課程發展組</w:t></w:r></w:p>
         <w:p><w:r><w:t>三、計畫編號：115609782</w:t></w:r></w:p>
+        <w:p><w:r><w:t>姓 名：柯同學　學系：企管碩一　學號：114000001　聯絡電話：0912345678</w:t></w:r></w:p>
         <w:tbl>
           ${row(["編號", "工作日期", "開始", "結束", "時數", "工作酬金", "工作地點", "工作內容", "簽章"])}
           ${row(["1", "7/1", "9:00", "12:00", "3", "588", "維澈樓312研究室", "課程字幕製作", "柯同學"])}
           ${row(["2", "7/1", "13:00", "16:00", "3", secondPay, "維澈樓312研究室", "課程字幕編輯", "柯同學"])}
         </w:tbl>
-        <w:p><w:r><w:t>計酬基準196元/時 X 6小時</w:t></w:r></w:p>
-        <w:p><w:r><w:t>金額:1176元</w:t></w:r></w:p>
+        ${totals ? `<w:p><w:r><w:t>計酬基準196元/時 X 6小時</w:t></w:r></w:p>
+        <w:p><w:r><w:t>金額:1176元</w:t></w:r></w:p>` : ""}
       </w:body>
     </w:document>`;
   return zipSync({ "word/document.xml": strToU8(xml) });
@@ -37,6 +39,10 @@ test("parses plan metadata, work rows and totals from a DOCX in memory", async (
   assert.equal(result.planName, "A82 發展雲端知識體系計畫");
   assert.equal(result.planNumber, "115609782");
   assert.equal(result.unit, "數位教育發展處數位課程發展組");
+  assert.equal(result.name, "柯同學");
+  assert.equal(result.department, "企管碩一");
+  assert.equal(result.studentId, "114000001");
+  assert.equal(result.phone, "0912345678");
   assert.equal(result.entries.length, 2);
   assert.deepEqual(result.entries[0], {
     id: "1",
@@ -46,10 +52,24 @@ test("parses plan metadata, work rows and totals from a DOCX in memory", async (
     hours: 3,
     pay: 588,
     location: "維澈樓312研究室",
-    workContent: "課程字幕製作"
+    workContent: "課程字幕製作",
+    signature: "柯同學"
   });
   assert.equal(result.claimedTotalHours, 6);
   assert.equal(result.claimedTotalPay, 1176);
+});
+
+test("infers the Gregorian year and month from a ROC document heading", async () => {
+  const result = await parseDocx(docxFixture());
+
+  assert.equal(result.entries[0].date, "2026-07-01");
+});
+
+test("keeps missing document totals blank instead of silently inventing them", async () => {
+  const result = await parseDocx(docxFixture({ totals: false }));
+
+  assert.equal(result.claimedTotalHours, "");
+  assert.equal(result.claimedTotalPay, "");
 });
 
 test("ignores instructional text boxes anchored inside table cells", async () => {

@@ -454,18 +454,18 @@ textarea:disabled { opacity: 0.55; cursor: not-allowed; }
 .annotation-badge {
   position: absolute;
   z-index: var(--z-raised);
-  top: calc(var(--space-sm) * -1);
-  left: calc(var(--space-xs) + var(--annotation-slot, 0) * 1.75rem);
+  top: -0.55rem;
+  right: calc(-0.45rem + var(--annotation-slot, 0) * 1.05rem);
   display: grid;
-  width: 1.65rem;
-  height: 1.65rem;
+  width: 1.05rem;
+  height: 1.05rem;
   place-items: center;
-  border: var(--rule-strong) solid var(--color-paper);
+  border: var(--rule-thin) solid var(--color-paper);
   border-radius: 50%;
   background: var(--color-error);
   color: var(--color-paper);
   font-family: var(--font-body);
-  font-size: var(--text-sm);
+  font-size: 0.65rem;
   font-weight: 800;
   line-height: 1;
   box-shadow: 0 var(--space-3xs) var(--space-xs) var(--color-shadow);
@@ -584,7 +584,7 @@ textarea:disabled { opacity: 0.55; cursor: not-allowed; }
   .shell { width: min(100% - 3rem, 92rem); }
   .intro { grid-template-columns: minmax(0, 1.15fr) minmax(18rem, 0.85fr); }
   .intro--student { grid-template-columns: minmax(0, 0.8fr) minmax(24rem, 1.2fr); }
-  .upload-stage__controls { grid-template-columns: minmax(12rem, 0.34fr) minmax(0, 1fr); align-items: stretch; }
+  .upload-stage__controls { grid-template-columns: minmax(0, 1fr); align-items: stretch; }
   .upload-actions { display: flex; flex-wrap: wrap; }
   .upload-actions .file-label { width: auto; }
   .step-list li { flex-direction: row; font-size: var(--text-sm); }

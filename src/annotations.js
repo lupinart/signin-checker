@@ -7,6 +7,10 @@ function valuesForField(sheet, field, entryIds = []) {
     planName: sheet.planName,
     planNumber: sheet.planNumber,
     unit: sheet.unit,
+    name: sheet.name,
+    department: sheet.department,
+    studentId: sheet.studentId,
+    phone: sheet.phone,
     totalHours: sheet.claimedTotalHours,
     totalPay: sheet.claimedTotalPay
   };
@@ -49,6 +53,63 @@ function matchesText(element, values) {
   });
 }
 
+export function findAnnotationTarget(candidates, annotation) {
+  const labelled = {
+    planName: ["計畫名稱"],
+    planNumber: ["計畫編號"],
+    unit: ["執行單位"],
+    name: ["姓名"],
+    department: ["學系"],
+    studentId: ["學號"],
+    phone: ["聯絡電話"],
+    totalHours: ["計酬基準", "小時"],
+    totalPay: ["金額", "元"]
+  }[annotation.field];
+  if (labelled) {
+    const semanticMatch = candidates.find((candidate) => {
+      const value = clean(candidate.textContent);
+      return labelled.every((label) => value.includes(clean(label)))
+        && (!annotation.searchTexts.length || matchesText(candidate, annotation.searchTexts));
+    });
+    if (semanticMatch) return semanticMatch;
+  }
+  return candidates.find((candidate) => matchesText(candidate, annotation.searchTexts));
+}
+
+export function fieldColumnIndex(field, cellCount) {
+  const expandedTimeColumns = cellCount >= 9;
+  return ({
+    date: 1,
+    hours: expandedTimeColumns ? 4 : 3,
+    pay: expandedTimeColumns ? 5 : 4,
+    location: expandedTimeColumns ? 6 : 5,
+    workContent: expandedTimeColumns ? 7 : 6,
+    signature: expandedTimeColumns ? 8 : 7
+  })[field] ?? -1;
+}
+
+function fieldCell(root, row, cells, field) {
+  const directIndex = fieldColumnIndex(field, cells.length);
+  if (directIndex >= 0 && cells[directIndex]) return cells[directIndex];
+  const labels = {
+    date: ["工作日期", "日期"],
+    hours: ["工作時數", "時數"],
+    pay: ["工作酬金", "酬金", "金額"],
+    location: ["工作地點"],
+    workContent: ["工作內容"],
+    signature: ["簽章"]
+  }[field];
+  if (!labels) return null;
+  const header = [...root.querySelectorAll("tr")].find((candidate) =>
+    [...candidate.querySelectorAll("td, th")].some((cell) => labels.some((label) => clean(cell.textContent).includes(clean(label))))
+  );
+  if (!header || header === row) return null;
+  const index = [...header.querySelectorAll("td, th")].findIndex((cell) =>
+    labels.some((label) => clean(cell.textContent).includes(clean(label)))
+  );
+  return index >= 0 ? cells[index] : null;
+}
+
 function addDomMarker(target, annotation) {
   if (!target) return;
   target.classList.add("annotation-target");
@@ -57,6 +118,8 @@ function addDomMarker(target, annotation) {
   const badge = document.createElement("span");
   badge.className = "annotation-badge";
   badge.textContent = String(annotation.number);
+  badge.dataset.annotationNumber = String(annotation.number);
+  badge.dataset.severity = annotation.severity;
   badge.setAttribute("aria-hidden", "true");
   badge.style.setProperty("--annotation-slot", String(target.querySelectorAll(":scope > .annotation-badge").length));
   target.append(badge);
@@ -72,21 +135,23 @@ export function annotateRenderedDocx(root, annotations) {
         });
         if (!row) continue;
         const cells = [...row.querySelectorAll("td, th")];
-        addDomMarker(cells.find((cell) => matchesText(cell, target.searchTexts)) ?? cells[0], annotation);
+        addDomMarker(fieldCell(root, row, cells, annotation.field)
+          ?? cells.find((cell) => matchesText(cell, target.searchTexts))
+          ?? cells[0], annotation);
       }
       continue;
     }
 
     const candidates = [...root.querySelectorAll("p, td, th")];
-    addDomMarker(candidates.find((candidate) => matchesText(candidate, annotation.searchTexts)), annotation);
+    addDomMarker(findAnnotationTarget(candidates, annotation), annotation);
   }
 }
 
 function fallbackBox(annotation) {
   const firstEntry = Number(annotation.entryIds[0] ?? 1);
-  const x = { date: 10, time: 23, hours: 44, pay: 54, location: 63, workContent: 80 }[annotation.field] ?? 8;
+  const x = { date: 10, time: 23, hours: 44, pay: 54, location: 63, workContent: 80, signature: 94 }[annotation.field] ?? 8;
   const width = { time: 20, location: 22, workContent: 18 }[annotation.field] ?? 13;
-  const metadataY = { planName: 7, unit: 12, planNumber: 17, totalHours: 86, totalPay: 86 }[annotation.field];
+  const metadataY = { planName: 7, unit: 12, planNumber: 17, name: 20, department: 20, studentId: 23, phone: 23, totalHours: 86, totalPay: 86 }[annotation.field];
   return { left: x, top: metadataY ?? Math.min(78, 28 + (firstEntry - 1) * 8), width, height: 6 };
 }
 

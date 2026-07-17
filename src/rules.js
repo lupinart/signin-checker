@@ -72,6 +72,18 @@ function addMetadataIssues(sheet, profile, issues) {
   }
 }
 
+function addPersonalInfoIssues(sheet, issues) {
+  const required = [
+    ["name", "NAME_REQUIRED", "姓名未填寫。"],
+    ["department", "DEPARTMENT_REQUIRED", "學系未填寫。"],
+    ["studentId", "STUDENT_ID_REQUIRED", "學號未填寫。"],
+    ["phone", "PHONE_REQUIRED", "聯絡電話未填寫。"]
+  ];
+  for (const [field, code, message] of required) {
+    if (!text(sheet[field])) issues.push(makeIssue(code, SEVERITY.error, message, { field }));
+  }
+}
+
 function addLocationIssues(item, profile, issues) {
   const location = text(item.location);
   const config = profile.location ?? {};
@@ -180,7 +192,7 @@ function validateEntry(item, profile, issues) {
     }
     const expectedPay = roundMoney(calculatedHours * Number(profile.hourlyRate));
     if (Math.abs(Number(item.pay) - expectedPay) > 0.001) {
-      issues.push(makeIssue("ROW_PAY_MISMATCH", SEVERITY.error, `本筆工作酬金應為 ${expectedPay} 元。`, {
+      issues.push(makeIssue("ROW_PAY_MISMATCH", SEVERITY.error, `本筆工作酬金應為 ${expectedPay} 元（${calculatedHours} 小時 × 時薪 ${Number(profile.hourlyRate)} 元）。`, {
         entryIds: [item.id], field: "pay"
       }));
     }
@@ -188,6 +200,18 @@ function validateEntry(item, profile, issues) {
 
   addLocationIssues(item, profile, issues);
   addWorkContentIssues(item, profile, issues);
+
+  const signature = text(item.signature).replaceAll(/[（(]手簽[)）]/g, "").replaceAll(/\s+/g, "");
+  const name = text(profile.sheetName ?? "");
+  if (!signature) {
+    issues.push(makeIssue("SIGNATURE_REQUIRED", SEVERITY.error, "本筆簽章空白，請由本人手寫簽名。", {
+      entryIds: [item.id], field: "signature"
+    }));
+  } else if (name && !signature.includes(name) && !name.includes(signature)) {
+    issues.push(makeIssue("SIGNATURE_NAME_MISMATCH", SEVERITY.review, "簽章姓名似乎與上方姓名不同，請人工確認是本人手寫。", {
+      entryIds: [item.id], field: "signature"
+    }));
+  }
 
   return { ...item, dateObject: date, startMinutes: start, endMinutes: end, calculatedMinutes };
 }
@@ -254,7 +278,9 @@ function addWeeklyIssues(validated, issues) {
 export function checkTimesheet(sheet, profile) {
   const issues = [];
   addMetadataIssues(sheet, profile, issues);
-  const validated = (sheet.entries ?? []).map((item) => validateEntry(item, profile, issues));
+  addPersonalInfoIssues(sheet, issues);
+  const profileWithName = { ...profile, sheetName: text(sheet.name).replaceAll(/\s+/g, "") };
+  const validated = (sheet.entries ?? []).map((item) => validateEntry(item, profileWithName, issues));
   addDailyIssues(validated, issues);
   addWeeklyIssues(validated, issues);
 
@@ -265,7 +291,7 @@ export function checkTimesheet(sheet, profile) {
     issues.push(makeIssue("TOTAL_HOURS_MISMATCH", SEVERITY.error, `合計時數應為 ${totalHours} 小時。`, { field: "totalHours" }));
   }
   if (Math.abs(Number(sheet.claimedTotalPay) - totalPay) > 0.001) {
-    issues.push(makeIssue("TOTAL_PAY_MISMATCH", SEVERITY.error, `合計金額應為 ${totalPay} 元。`, { field: "totalPay" }));
+    issues.push(makeIssue("TOTAL_PAY_MISMATCH", SEVERITY.error, `合計金額應為 ${totalPay} 元（合計 ${totalHours} 小時 × 時薪 ${Number(profile.hourlyRate)} 元）。`, { field: "totalPay" }));
   }
 
   return {
@@ -275,7 +301,7 @@ export function checkTimesheet(sheet, profile) {
       { code: "ACTUAL_LOCATION_CONFIRMED", label: "工作地點是本次實際地點，並非照抄範例。" },
       { code: "ACTUAL_WORK_CONFIRMED", label: "工作內容是本次實際完成的事項。" },
       { code: "NO_DUPLICATE_CLAIM", label: "沒有與其他計畫在同一時段重複請領。" },
-      { code: "SIGNATURES_COMPLETE", label: "紙本簽名及所有塗改處均已完成簽章。" }
+      { code: "SIGNATURES_COMPLETE", label: "每筆簽章、頁尾聲明及所有塗改處都有本人手寫簽名，且與上方姓名相同。" }
     ]
   };
 }
