@@ -10,6 +10,7 @@ let expectedRows = Number(process.env.QA_EXPECTED_ROWS || 0);
 const chromePath = process.env.QA_CHROME_PATH ?? "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 const artifactDir = new URL("../artifacts/", import.meta.url);
 const artifactPath = (name) => fileURLToPath(new URL(name, artifactDir));
+const ocrFixture = new URL("ocr-fixture.png", artifactDir);
 await mkdir(artifactDir, { recursive: true });
 
 if (!exampleDocx) {
@@ -34,39 +35,70 @@ const browser = await chromium.launch({
 });
 
 const context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, locale: "zh-TW" });
+const ocrFixturePage = await context.newPage();
+await ocrFixturePage.setContent(`
+  <style>body{margin:50px;background:white;color:black;font:30px/1.8 Arial,sans-serif}pre{white-space:pre-wrap}</style>
+  <pre>計畫名稱：A82 發展雲端知識體系計畫
+計畫編號：115609782
+執行單位：數位教育發展處數位課程發展組
+
+1 7/1 09:00 12:00 3 588 維澈樓312研究室 課程字幕製作
+
+X 3小時　金額：588元</pre>
+`);
+await ocrFixturePage.screenshot({ path: fileURLToPath(ocrFixture), fullPage: true });
+await ocrFixturePage.close();
+
 const page = await context.newPage();
 const consoleErrors = [];
 const failedResources = [];
 const outgoingWrites = [];
-page.on("console", (message) => {
-  if (message.type() === "error") consoleErrors.push({ text: message.text(), location: message.location() });
-});
-page.on("response", (response) => {
-  if (response.status() >= 400) failedResources.push({ status: response.status(), url: response.url() });
-});
-page.on("request", (request) => {
-  if (!['GET', 'HEAD', 'OPTIONS'].includes(request.method())) outgoingWrites.push({ method: request.method(), url: request.url() });
-});
+function monitor(target) {
+  target.on("console", (message) => {
+    const knownTesseractWarning = message.text().startsWith("Warning: Parameter not found:")
+      && message.location().url.includes("tesseract-core");
+    if (message.type() === "error" && !knownTesseractWarning) {
+      consoleErrors.push({ text: message.text(), location: message.location() });
+    }
+  });
+  target.on("response", (response) => {
+    if (response.status() >= 400) failedResources.push({ status: response.status(), url: response.url() });
+  });
+  target.on("request", (request) => {
+    if (!["GET", "HEAD", "OPTIONS"].includes(request.method())) outgoingWrites.push({ method: request.method(), url: request.url() });
+  });
+}
+monitor(page);
 
 await page.goto(baseUrl, { waitUntil: "networkidle" });
 assert.match(await page.locator("body").innerText(), /文件、照片與辨識文字不會離開這台裝置/);
 await page.screenshot({ path: artifactPath("checker-desktop.png"), fullPage: true });
 
 await page.locator("#docx-input").setInputFiles(exampleDocx);
-await page.locator("#review-panel").waitFor({ state: "visible" });
-const rows = await page.locator(".entry-card").count();
+await page.locator("#results-panel").waitFor({ state: "visible" });
+const rows = Math.max(0, await page.locator("#annotated-document tr").count() - 1);
 if (expectedRows) assert.equal(rows, expectedRows);
 else assert.ok(rows > 0);
-assert.equal(await page.locator("#plan-number").inputValue(), "115609782");
-assert.match(await page.locator("#file-status").innerText(), new RegExp(`${rows} 筆工作紀錄`));
+assert.match(await page.locator("#file-status").innerText(), /檢查完成/);
 assert.equal(await page.evaluate(() => [...document.querySelectorAll("input:not([type=hidden]), select, textarea")]
   .filter((element) => element.offsetParent !== null && !(element.labels?.length) && !element.getAttribute("aria-label")).length), 0);
-await page.screenshot({ path: artifactPath("checker-docx-review.png"), fullPage: true });
-
-await page.locator("#check-button").click();
-await page.locator("#results-panel").waitFor({ state: "visible" });
 assert.ok(await page.locator(".issue").count() > 0);
+assert.ok(await page.locator("[data-annotation-number]").count() > 0);
+assert.equal(await page.locator(".issue").count(), await page.locator(".issue__number").count());
 await page.screenshot({ path: artifactPath("checker-results.png"), fullPage: true });
+
+const ocrPage = await context.newPage();
+monitor(ocrPage);
+await ocrPage.goto(baseUrl, { waitUntil: "networkidle" });
+await ocrPage.locator("#image-input").setInputFiles(fileURLToPath(ocrFixture));
+await ocrPage.locator("#results-panel").waitFor({ state: "visible", timeout: 120_000 });
+assert.match(await ocrPage.locator("#file-status").innerText(), /檢查完成/);
+assert.equal(await ocrPage.locator("#ocr-raw").count(), 0);
+assert.ok(await ocrPage.locator(".photo-frame img").count() > 0);
+assert.ok(await ocrPage.locator(".image-annotation").count() > 0);
+assert.ok(await ocrPage.locator(".issue").count() > 0);
+await ocrPage.screenshot({ path: artifactPath("checker-ocr-results.png"), fullPage: true });
+await ocrPage.close();
 
 await page.goto(`${baseUrl}/admin.html`, { waitUntil: "networkidle" });
 await page.locator("#admin-layout").waitFor({ state: "visible" });
@@ -80,8 +112,6 @@ await page.screenshot({ path: artifactPath("admin-desktop.png"), fullPage: true 
 
 await page.goto(baseUrl, { waitUntil: "networkidle" });
 await page.locator("#docx-input").setInputFiles(exampleDocx);
-await page.locator("#review-panel").waitFor({ state: "visible" });
-await page.locator("#check-button").click();
 await page.locator("#results-panel").waitFor({ state: "visible" });
 assert.equal(await page.getByText("工作地點包含「家裡」，本計畫要求在校內工作。").count(), 0);
 
@@ -98,6 +128,14 @@ for (const width of [320, 375, 414, 768, 1024, 1440, 1920]) {
   assert.ok(dimensions.scrollWidth <= dimensions.clientWidth, `horizontal overflow at ${width}px`);
   await mobile.screenshot({ path: artifactPath(`checker-${width}.png`), fullPage: true });
   if (width <= 768) {
+    await mobile.locator("#docx-input").setInputFiles(exampleDocx);
+    await mobile.locator("#results-panel").waitFor({ state: "visible" });
+    const resultDimensions = await mobile.evaluate(() => ({
+      clientWidth: document.documentElement.clientWidth,
+      scrollWidth: document.documentElement.scrollWidth
+    }));
+    assert.ok(resultDimensions.scrollWidth <= resultDimensions.clientWidth, `result horizontal overflow at ${width}px`);
+    await mobile.screenshot({ path: artifactPath(`checker-results-${width}.png`), fullPage: true });
     await mobile.goto(`${baseUrl}/admin.html`, { waitUntil: "networkidle" });
     const adminDimensions = await mobile.evaluate(() => ({
       clientWidth: document.documentElement.clientWidth,
@@ -114,4 +152,4 @@ await writeFile(new URL("qa-report.json", artifactDir), JSON.stringify({ rows, l
 if (failedResources.length) console.error(failedResources);
 assert.deepEqual(consoleErrors, []);
 assert.deepEqual(outgoingWrites, []);
-console.log(`QA passed: ${rows} rows, ${layouts.length} mobile widths, no console errors.`);
+console.log(`QA passed: Word ${rows} rows, local photo OCR, ${layouts.length} mobile widths, no console errors.`);

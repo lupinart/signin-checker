@@ -1,3 +1,4 @@
+import { annotateImage, annotateRenderedDocx, buildAnnotations } from "./annotations.js";
 import { parseDocx } from "./docx.js";
 import { parseOcrText, recognizeImage } from "./ocr.js";
 import { findProfile } from "./profiles.js";
@@ -14,30 +15,17 @@ const elements = {
   ocrProgress: document.querySelector("#ocr-progress"),
   ocrPercent: document.querySelector("#ocr-percent"),
   ocrBar: document.querySelector("#ocr-bar"),
-  sourcePreview: document.querySelector("#source-preview"),
   clearButton: document.querySelector("#clear-button"),
   uploadStage: document.querySelector("#upload-stage"),
-  reviewPanel: document.querySelector("#review-panel"),
   resultsPanel: document.querySelector("#results-panel"),
-  sourceKind: document.querySelector("#source-kind"),
-  planName: document.querySelector("#plan-name"),
-  planNumber: document.querySelector("#plan-number"),
-  unit: document.querySelector("#unit"),
-  profilePickerWrap: document.querySelector("#profile-picker-wrap"),
-  profilePicker: document.querySelector("#profile-picker"),
-  entryList: document.querySelector("#entry-list"),
-  totalHours: document.querySelector("#total-hours"),
-  totalPay: document.querySelector("#total-pay"),
-  rawWrap: document.querySelector("#ocr-raw-wrap"),
-  rawText: document.querySelector("#ocr-raw"),
-  addRow: document.querySelector("#add-row"),
-  backToReview: document.querySelector("#back-to-review"),
+  annotatedDocument: document.querySelector("#annotated-document"),
   issueSummary: document.querySelector("#issue-summary"),
   issueList: document.querySelector("#issue-list"),
   declarationList: document.querySelector("#declaration-list"),
   completion: document.querySelector("#completion-callout"),
   download: document.querySelector("#download-report"),
   newCheck: document.querySelector("#new-check"),
+  newCheckTop: document.querySelector("#new-check-top"),
   profileVersion: document.querySelector("#profile-version"),
   steps: [...document.querySelectorAll("#step-list li")]
 };
@@ -45,7 +33,6 @@ const elements = {
 const state = {
   profiles: [],
   sourceUrl: null,
-  sourceKind: "",
   currentProfile: null,
   sheet: null,
   result: null
@@ -69,202 +56,6 @@ function contextFromPeriod() {
   return { year: year || new Date().getFullYear(), month: month || new Date().getMonth() + 1 };
 }
 
-function setValue(element, value) {
-  element.value = value ?? "";
-}
-
-function field(label, name, value, options = {}) {
-  const wrapper = document.createElement("div");
-  wrapper.className = "field";
-  const id = `entry-${options.entryId}-${name}`;
-  const labelElement = document.createElement("label");
-  labelElement.htmlFor = id;
-  labelElement.textContent = label;
-  const input = document.createElement("input");
-  input.className = "input";
-  input.id = id;
-  input.name = name;
-  input.value = value ?? "";
-  input.dataset.entryField = name;
-  if (options.type) input.type = options.type;
-  if (options.step) input.step = options.step;
-  if (options.inputMode) input.inputMode = options.inputMode;
-  wrapper.append(labelElement, input);
-  return wrapper;
-}
-
-function createEntryCard(entry, index) {
-  const card = document.createElement("article");
-  card.className = "entry-card";
-  card.dataset.entryId = String(entry.id || index + 1);
-
-  const head = document.createElement("div");
-  head.className = "entry-card__head";
-  const number = document.createElement("span");
-  number.className = "entry-card__number";
-  number.textContent = `第 ${card.dataset.entryId} 列`;
-  const remove = document.createElement("button");
-  remove.className = "button button--quiet";
-  remove.type = "button";
-  remove.textContent = "移除";
-  remove.addEventListener("click", () => {
-    card.remove();
-    renumberEntries();
-  });
-  head.append(number, remove);
-
-  const grid = document.createElement("div");
-  grid.className = "field-grid";
-  const id = card.dataset.entryId;
-  grid.append(
-    field("日期", "date", entry.date, { entryId: id, type: "date" }),
-    field("開始", "start", entry.start, { entryId: id, type: "time" }),
-    field("結束", "end", entry.end, { entryId: id, type: "time" }),
-    field("時數", "hours", entry.hours, { entryId: id, type: "number", step: "0.01", inputMode: "decimal" }),
-    field("日薪", "pay", entry.pay, { entryId: id, type: "number", step: "1", inputMode: "numeric" }),
-    field("工作地點", "location", entry.location, { entryId: id }),
-    field("工作內容", "workContent", entry.workContent, { entryId: id })
-  );
-  card.append(head, grid);
-  return card;
-}
-
-function renumberEntries() {
-  [...elements.entryList.children].forEach((card, index) => {
-    card.dataset.entryId = String(index + 1);
-    card.querySelector(".entry-card__number").textContent = `第 ${index + 1} 列`;
-  });
-}
-
-function renderEntries(entries) {
-  elements.entryList.replaceChildren();
-  const rows = entries.length ? entries : [{ id: "1", date: "", start: "", end: "", hours: "", pay: "", location: "", workContent: "" }];
-  rows.forEach((entry, index) => elements.entryList.append(createEntryCard(entry, index)));
-}
-
-function populateProfilePicker() {
-  elements.profilePicker.replaceChildren();
-  for (const profile of state.profiles) {
-    const option = document.createElement("option");
-    option.value = profile.id;
-    option.textContent = `${profile.planNumber} · ${profile.planName}`;
-    elements.profilePicker.append(option);
-  }
-}
-
-function selectProfile(sheet) {
-  const matched = findProfile(state.profiles, sheet);
-  state.currentProfile = matched ?? state.profiles[0] ?? null;
-  elements.profilePickerWrap.hidden = Boolean(matched);
-  if (state.currentProfile) elements.profilePicker.value = state.currentProfile.id;
-}
-
-function showReview(sheet, sourceKind) {
-  state.sheet = sheet;
-  state.sourceKind = sourceKind;
-  elements.resultsPanel.hidden = true;
-  elements.reviewPanel.hidden = false;
-  elements.sourceKind.textContent = sourceKind === "docx" ? "Word 本機解析" : "照片本機 OCR";
-  setValue(elements.planName, sheet.planName);
-  setValue(elements.planNumber, sheet.planNumber);
-  setValue(elements.unit, sheet.unit);
-  setValue(elements.totalHours, sheet.claimedTotalHours);
-  setValue(elements.totalPay, sheet.claimedTotalPay);
-  renderEntries(sheet.entries ?? []);
-  elements.rawWrap.hidden = sourceKind !== "image";
-  setValue(elements.rawText, sheet.rawText);
-  selectProfile(sheet);
-  elements.clearButton.hidden = false;
-  elements.clearButton.disabled = false;
-  setStep(2);
-  elements.reviewPanel.scrollIntoView({ behavior: "smooth", block: "start" });
-}
-
-function resetSourcePreview() {
-  if (state.sourceUrl) URL.revokeObjectURL(state.sourceUrl);
-  state.sourceUrl = null;
-  elements.sourcePreview.replaceChildren();
-  elements.sourcePreview.hidden = true;
-}
-
-async function handleDocx(file) {
-  resetSourcePreview();
-  setStatus(`正在本機解析 ${file.name}…`);
-  try {
-    const sheet = await parseDocx(await file.arrayBuffer(), contextFromPeriod());
-    setStatus(`已在本機讀取 ${sheet.entries.length} 筆工作紀錄。`, "success");
-    showReview(sheet, "docx");
-  } catch (error) {
-    setStatus(error.message, "error");
-  }
-}
-
-async function handleImage(file) {
-  resetSourcePreview();
-  state.sourceUrl = URL.createObjectURL(file);
-  const image = document.createElement("img");
-  image.src = state.sourceUrl;
-  image.alt = "待檢查的簽到單照片預覽";
-  elements.sourcePreview.append(image);
-  elements.sourcePreview.hidden = false;
-  elements.ocrProgress.hidden = false;
-  setStatus(`正在本機辨識 ${file.name}，第一次載入中文模型會較久。`);
-  try {
-    const recognized = await recognizeImage(file, (progress) => {
-      elements.ocrPercent.textContent = `${progress}%`;
-      elements.ocrBar.style.setProperty("--progress-scale", String(progress / 100));
-    });
-    const sheet = parseOcrText(recognized.text, contextFromPeriod());
-    setStatus(`照片辨識完成，整體信心約 ${Math.round(recognized.confidence)}%。請逐欄確認。`, "success");
-    showReview(sheet, "image");
-  } catch (error) {
-    setStatus(`照片辨識未完成：${error.message}。請確認網路可載入辨識模型，或改用 Word。`, "error");
-  } finally {
-    elements.ocrProgress.hidden = true;
-  }
-}
-
-function collectSheet() {
-  const entries = [...elements.entryList.querySelectorAll(".entry-card")].map((card, index) => {
-    const value = (name) => card.querySelector(`[data-entry-field="${name}"]`).value;
-    return {
-      id: String(index + 1),
-      date: value("date"),
-      start: value("start"),
-      end: value("end"),
-      hours: Number(value("hours")),
-      pay: Number(value("pay")),
-      location: value("location"),
-      workContent: value("workContent")
-    };
-  });
-  return {
-    planName: elements.planName.value.trim(),
-    planNumber: elements.planNumber.value.trim(),
-    unit: elements.unit.value.trim(),
-    entries,
-    claimedTotalHours: Number(elements.totalHours.value),
-    claimedTotalPay: Number(elements.totalPay.value)
-  };
-}
-
-function groupedIssues(issues) {
-  const groups = new Map();
-  for (const issue of issues) {
-    const key = `${issue.code}:${issue.message}`;
-    if (!groups.has(key)) groups.set(key, { ...issue, entryIds: [] });
-    groups.get(key).entryIds.push(...(issue.entryIds ?? []));
-  }
-  return [...groups.values()].map((issue) => ({ ...issue, entryIds: [...new Set(issue.entryIds)] }));
-}
-
-function markEntryErrors(issues) {
-  const errorIds = new Set(issues.filter((issue) => issue.severity === "error").flatMap((issue) => issue.entryIds ?? []));
-  [...elements.entryList.children].forEach((card) => {
-    card.dataset.hasError = errorIds.has(card.dataset.entryId) ? "true" : "false";
-  });
-}
-
 function issueCount(label, count, tone) {
   const box = document.createElement("div");
   box.className = `issue-count issue-count--${tone}`;
@@ -276,54 +67,124 @@ function issueCount(label, count, tone) {
   return box;
 }
 
-function renderIssues(result) {
-  const summary = summarizeIssues(result.issues);
+function focusAnnotation(number) {
+  const markers = [...elements.annotatedDocument.querySelectorAll(`[data-annotation-number="${number}"]`)];
+  markers.forEach((marker) => { marker.dataset.active = "true"; });
+  markers[0]?.scrollIntoView({ behavior: "smooth", block: "center", inline: "center" });
+  window.setTimeout(() => markers.forEach((marker) => delete marker.dataset.active), 1600);
+}
+
+function renderIssues(annotations) {
+  const summary = summarizeIssues(annotations);
   elements.issueSummary.replaceChildren(
     issueCount("必須修改", summary.error, "error"),
     issueCount("需要確認", summary.review, "review"),
     issueCount("填寫建議", summary.tip, "tip")
   );
   elements.issueList.replaceChildren();
-  const issues = groupedIssues(result.issues);
-  if (!issues.length) {
+
+  if (!annotations.length) {
     const empty = document.createElement("div");
     empty.className = "callout";
-    const title = document.createElement("strong");
-    title.textContent = "沒有找到自動檢查錯誤";
-    const note = document.createElement("span");
-    note.textContent = "仍請完成下方人工確認。";
-    empty.append(title, note);
+    empty.innerHTML = "<strong>沒有找到自動檢查錯誤</strong><span>仍請完成下方人工確認。</span>";
     elements.issueList.append(empty);
+    return;
   }
-  for (const issue of issues) {
+
+  for (const annotation of annotations) {
     const article = document.createElement("article");
     article.className = "issue";
-    article.dataset.severity = issue.severity;
+    article.dataset.severity = annotation.severity;
+    const number = document.createElement("span");
+    number.className = "issue__number";
+    number.textContent = String(annotation.number);
+    const copy = document.createElement("div");
+    copy.className = "issue__copy";
     const title = document.createElement("strong");
-    title.textContent = issue.severity === "error" ? "必須修改" : issue.severity === "review" ? "需要確認" : "填寫建議";
+    title.textContent = annotation.severity === "error" ? "必須修改" : annotation.severity === "review" ? "需要確認" : "填寫建議";
     const message = document.createElement("span");
-    message.textContent = issue.message;
-    article.append(title, message);
-    if (issue.entryIds.length) {
+    message.textContent = annotation.message;
+    copy.append(title, message);
+    if (annotation.entryIds.length) {
       const rows = document.createElement("small");
-      rows.textContent = `相關列：${issue.entryIds.join("、")}`;
-      article.append(rows);
-      const locate = document.createElement("button");
-      locate.className = "button button--quiet";
-      locate.type = "button";
-      locate.textContent = "返回該列";
-      locate.addEventListener("click", () => {
-        elements.resultsPanel.hidden = true;
-        elements.reviewPanel.hidden = false;
-        setStep(2);
-        const card = elements.entryList.querySelector(`[data-entry-id="${CSS.escape(issue.entryIds[0])}"]`);
-        card?.scrollIntoView({ behavior: "smooth", block: "center" });
-        card?.querySelector("input")?.focus({ preventScroll: true });
-      });
-      article.append(locate);
+      rows.textContent = `相關列：${annotation.entryIds.join("、")}`;
+      copy.append(rows);
     }
+    const locate = document.createElement("button");
+    locate.className = "issue__locate";
+    locate.type = "button";
+    locate.textContent = `查看標記 ${annotation.number}`;
+    locate.addEventListener("click", () => focusAnnotation(annotation.number));
+    copy.append(locate);
+    article.append(number, copy);
     elements.issueList.append(article);
   }
+}
+
+function addCell(row, value, tagName = "td") {
+  const cell = document.createElement(tagName);
+  cell.textContent = value ?? "";
+  row.append(cell);
+}
+
+function renderSheetFallback(sheet) {
+  const paper = document.createElement("div");
+  paper.className = "document-fallback";
+  const title = document.createElement("h3");
+  title.textContent = "計畫案工讀生及臨時工簽到單";
+  const metadata = document.createElement("div");
+  metadata.className = "document-metadata";
+  for (const [label, value] of [["計畫名稱", sheet.planName], ["執行單位", sheet.unit], ["計畫編號", sheet.planNumber]]) {
+    const line = document.createElement("p");
+    line.append(`${label}：`, document.createTextNode(value ?? ""));
+    metadata.append(line);
+  }
+  const table = document.createElement("table");
+  const header = document.createElement("tr");
+  ["編號", "日期", "開始", "結束", "時數", "酬金", "工作地點", "工作內容"].forEach((value) => addCell(header, value, "th"));
+  table.append(header);
+  for (const entry of sheet.entries ?? []) {
+    const row = document.createElement("tr");
+    [entry.id, entry.date, entry.start, entry.end, entry.hours, entry.pay, entry.location, entry.workContent].forEach((value) => addCell(row, value));
+    table.append(row);
+  }
+  const totals = document.createElement("p");
+  totals.textContent = `合計時數：${sheet.claimedTotalHours ?? ""}　合計金額：${sheet.claimedTotalPay ?? ""}`;
+  paper.append(title, metadata, table, totals);
+  elements.annotatedDocument.append(paper);
+  return paper;
+}
+
+async function renderDocxSource(buffer, sheet, annotations) {
+  const rendered = document.createElement("div");
+  rendered.className = "docx-render";
+  elements.annotatedDocument.append(rendered);
+  try {
+    const { renderAsync } = await import("docx-preview");
+    await renderAsync(buffer, rendered, null, {
+      inWrapper: true,
+      ignoreWidth: false,
+      ignoreHeight: false,
+      ignoreLastRenderedPageBreak: false,
+      debug: false
+    });
+    annotateRenderedDocx(rendered, annotations);
+  } catch {
+    rendered.remove();
+    annotateRenderedDocx(renderSheetFallback(sheet), annotations);
+  }
+}
+
+async function renderImageSource(url, annotations, lines) {
+  const frame = document.createElement("div");
+  frame.className = "photo-frame";
+  const image = document.createElement("img");
+  image.src = url;
+  image.alt = "已標記問題的簽到單照片";
+  frame.append(image);
+  elements.annotatedDocument.append(frame);
+  await image.decode().catch(() => {});
+  annotateImage(frame, annotations, lines, image.naturalWidth, image.naturalHeight);
 }
 
 function updateCompletion() {
@@ -332,6 +193,7 @@ function updateCompletion() {
   elements.download.disabled = !complete;
   elements.completion.querySelector("strong").textContent = complete ? "人工確認已完成" : "尚未完成人工確認";
   elements.completion.querySelector("span").textContent = complete ? "你可以下載不含個資的檢查清單。" : "勾選全部項目後，再下載匿名檢查清單。";
+  setStep(complete ? 3 : 2);
 }
 
 function renderDeclarations(declarations) {
@@ -351,42 +213,69 @@ function renderDeclarations(declarations) {
   updateCompletion();
 }
 
-function showResults(sheet, profile) {
+async function showResults(sheet, source) {
+  const profile = findProfile(state.profiles, sheet) ?? state.profiles[0];
+  if (!profile) throw new Error("找不到可用的計畫規則，請聯絡管理者。");
   state.sheet = sheet;
   state.currentProfile = profile;
   state.result = checkTimesheet(sheet, profile);
-  markEntryErrors(state.result.issues);
-  renderIssues(state.result);
+  const annotations = buildAnnotations(state.result.issues, sheet);
+  renderIssues(annotations);
   renderDeclarations(state.result.declarations);
   elements.profileVersion.textContent = `${profile.planName} · 規則版本 ${profile.version ?? 1}`;
-  elements.reviewPanel.hidden = true;
+  elements.annotatedDocument.replaceChildren();
+  if (source.kind === "docx") await renderDocxSource(source.buffer, sheet, annotations);
+  else await renderImageSource(source.url, annotations, source.lines);
   elements.resultsPanel.hidden = false;
-  setStep(4);
+  elements.clearButton.hidden = false;
+  elements.clearButton.disabled = false;
+  setStatus(`檢查完成，共有 ${annotations.length} 項提醒。請依編號核對。`, annotations.length ? "error" : "success");
   elements.resultsPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+async function handleDocx(file) {
+  setStatus(`正在本機解析並檢查 ${file.name}…`);
+  try {
+    const buffer = await file.arrayBuffer();
+    const sheet = await parseDocx(buffer, contextFromPeriod());
+    await showResults(sheet, { kind: "docx", buffer });
+  } catch (error) {
+    setStatus(error.message, "error");
+  }
+}
+
+async function handleImage(file) {
+  if (state.sourceUrl) URL.revokeObjectURL(state.sourceUrl);
+  state.sourceUrl = URL.createObjectURL(file);
+  elements.ocrProgress.hidden = false;
+  setStatus(`正在本機辨識並檢查 ${file.name}，第一次載入中文模型會較久。`);
+  try {
+    const recognized = await recognizeImage(file, (progress) => {
+      elements.ocrPercent.textContent = `${progress}%`;
+      elements.ocrBar.style.setProperty("--progress-scale", String(progress / 100));
+    });
+    const sheet = parseOcrText(recognized.text, contextFromPeriod());
+    await showResults(sheet, { kind: "image", url: state.sourceUrl, lines: recognized.lines });
+  } catch (error) {
+    setStatus(`照片辨識未完成：${error.message}。請換一張清楚、正面的照片，或改用 Word。`, "error");
+  } finally {
+    elements.ocrProgress.hidden = true;
+  }
 }
 
 function reportMarkdown(report) {
   const tone = { error: "必須修改", review: "需要確認", tip: "填寫建議" };
   return [
-    "# 簽到單匿名檢查清單",
-    "",
+    "# 簽到單匿名檢查清單", "",
     `- 計畫：${report.profile.planName}`,
     `- 計畫編號：${report.profile.planNumber}`,
     `- 規則版本：${report.profile.version}`,
     `- 產生時間：${report.generatedAt}`,
     `- 必須修改：${report.summary.error}`,
-    `- 需要確認：${report.summary.review}`,
-    "",
-    "## 檢查問題",
-    "",
-    ...report.issues.flatMap((issue) => [`- [${tone[issue.severity]}] ${issue.message}${issue.entryIds.length ? `（第 ${issue.entryIds.join("、")} 列）` : ""}`]),
-    "",
-    "## 人工確認",
-    "",
-    ...report.declarations.map((item) => `- [x] ${item.label}`),
-    "",
-    `> ${report.privacy}`,
-    ""
+    `- 需要確認：${report.summary.review}`, "", "## 檢查問題", "",
+    ...report.issues.map((issue, index) => `${index + 1}. [${tone[issue.severity]}] ${issue.message}${issue.entryIds.length ? `（第 ${issue.entryIds.join("、")} 列）` : ""}`),
+    "", "## 人工確認", "",
+    ...report.declarations.map((item) => `- [x] ${item.label}`), "", `> ${report.privacy}`, ""
   ].join("\n");
 }
 
@@ -402,51 +291,31 @@ function downloadReport() {
 }
 
 function clearAll() {
-  resetSourcePreview();
+  if (state.sourceUrl) URL.revokeObjectURL(state.sourceUrl);
+  state.sourceUrl = null;
   state.sheet = null;
   state.result = null;
   state.currentProfile = null;
   elements.docxInput.value = "";
   elements.imageInput.value = "";
-  elements.reviewPanel.reset();
-  elements.reviewPanel.hidden = true;
   elements.resultsPanel.hidden = true;
-  elements.rawWrap.hidden = true;
-  elements.entryList.replaceChildren();
+  elements.annotatedDocument.replaceChildren();
   elements.clearButton.hidden = true;
   elements.clearButton.disabled = true;
   setStatus("尚未選擇檔案。");
   setStep(1);
 }
 
+function startAnotherCheck() {
+  clearAll();
+  elements.uploadStage.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
 elements.docxInput.addEventListener("change", (event) => event.target.files[0] && handleDocx(event.target.files[0]));
 elements.imageInput.addEventListener("change", (event) => event.target.files[0] && handleImage(event.target.files[0]));
 elements.clearButton.addEventListener("click", clearAll);
-elements.newCheck.addEventListener("click", () => {
-  clearAll();
-  elements.uploadStage.scrollIntoView({ behavior: "smooth", block: "start" });
-});
-elements.backToReview.addEventListener("click", () => {
-  elements.resultsPanel.hidden = true;
-  elements.reviewPanel.hidden = false;
-  setStep(2);
-});
-elements.addRow.addEventListener("click", () => {
-  elements.entryList.append(createEntryCard({ id: String(elements.entryList.children.length + 1) }, elements.entryList.children.length));
-});
-elements.profilePicker.addEventListener("change", () => {
-  state.currentProfile = state.profiles.find((profile) => profile.id === elements.profilePicker.value) ?? null;
-});
-elements.reviewPanel.addEventListener("submit", (event) => {
-  event.preventDefault();
-  const sheet = collectSheet();
-  const profile = findProfile(state.profiles, sheet) ?? state.profiles.find((item) => item.id === elements.profilePicker.value) ?? state.currentProfile;
-  if (!profile) {
-    setStatus("找不到可用的計畫規則，請聯絡管理者。", "error");
-    return;
-  }
-  showResults(sheet, profile);
-});
+elements.newCheck.addEventListener("click", startAnotherCheck);
+elements.newCheckTop.addEventListener("click", startAnotherCheck);
 elements.download.addEventListener("click", downloadReport);
 
 for (const eventName of ["dragenter", "dragover"]) {
@@ -471,7 +340,6 @@ elements.uploadZone.addEventListener("drop", (event) => {
 
 try {
   state.profiles = await loadProfiles();
-  populateProfilePicker();
   if (!state.profiles.length) setStatus("目前沒有已啟用的計畫規則，請聯絡管理者。", "error");
 } catch (error) {
   setStatus(error.message, "error");

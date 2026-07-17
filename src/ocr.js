@@ -77,8 +77,11 @@ export async function recognizeImage(image, onProgress = () => {}) {
     }
   });
   try {
-    const { data } = await worker.recognize(image);
-    return { text: data.text, confidence: data.confidence ?? 0 };
+    const { data } = await worker.recognize(image, {}, { blocks: true });
+    const lines = (data.blocks ?? []).flatMap((block) => (block.paragraphs ?? []))
+      .flatMap((paragraph) => paragraph.lines ?? [])
+      .map((line) => ({ text: line.text ?? "", bbox: line.bbox }));
+    return { text: data.text, confidence: data.confidence ?? 0, lines };
   } finally {
     await worker.terminate();
   }

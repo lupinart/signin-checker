@@ -21,7 +21,7 @@
       <section class="intro intro--student" aria-labelledby="page-title">
         <h1 id="page-title">上傳簽到單，先自己檢查。</h1>
         <div class="intro__copy">
-          <p>上傳 Word 或直接拍照，確認辨識內容後，再檢查工時、休息、日期、地點、工作內容與金額。</p>
+          <p>上傳 Word 或直接拍照，系統會直接標出可能有問題的位置，並告訴你需要修改什麼。</p>
           <p class="privacy-line">你的文件、照片與辨識文字不會離開這台裝置。</p>
           <div class="manual-warning" role="note">
             <strong>人工檢查不可省略</strong>
@@ -40,9 +40,8 @@
         <div class="panel__body upload-stage__body">
           <ol class="step-list" id="step-list" aria-label="檢查流程">
             <li aria-current="step"><span data-step-marker>1</span><strong>上傳</strong></li>
-            <li><span data-step-marker>2</span><strong>核對</strong></li>
-            <li><span data-step-marker>3</span><strong>檢查</strong></li>
-            <li><span data-step-marker>4</span><strong>人工</strong></li>
+            <li><span data-step-marker>2</span><strong>看結果</strong></li>
+            <li><span data-step-marker>3</span><strong>人工確認</strong></li>
           </ol>
 
           <div class="upload-stage__controls">
@@ -69,85 +68,11 @@
               </div>
             </div>
           </div>
-          <div class="source-preview" id="source-preview" hidden></div>
           <button class="button button--quiet clear-button" id="clear-button" type="button" hidden disabled>清除這份資料</button>
         </div>
       </section>
 
       <div class="workspace">
-
-        <form class="panel" id="review-panel" hidden novalidate>
-            <div class="panel__header">
-              <div>
-                <h2>確認辨識內容</h2>
-                <p class="helper">請特別核對日期、時間、時數與工作地點。</p>
-              </div>
-              <span class="status-line" id="source-kind"></span>
-            </div>
-            <div class="panel__body">
-              <div class="callout" id="privacy-callout">
-                <strong>這一步仍然只在你的裝置進行</strong>
-                <span>頁面只會讀取公開的計畫規則，不會傳送以下表格內容。</span>
-              </div>
-              <div class="manual-warning" role="note">
-                <strong>人工檢查不可省略</strong>
-                <span>請對照原始簽到單逐欄確認，尤其是 OCR 帶入的日期、時間、地點、工作內容與金額。</span>
-              </div>
-
-              <div class="field-grid field-grid--3">
-                <div class="field">
-                  <label for="plan-name">計畫名稱</label>
-                  <input class="input" id="plan-name" name="planName" autocomplete="off">
-                </div>
-                <div class="field">
-                  <label for="plan-number">計畫編號</label>
-                  <input class="input" id="plan-number" name="planNumber" inputmode="numeric" autocomplete="off">
-                </div>
-                <div class="field">
-                  <label for="unit">執行單位</label>
-                  <input class="input" id="unit" name="unit" autocomplete="off">
-                </div>
-              </div>
-
-              <div class="field" id="profile-picker-wrap" hidden>
-                <label for="profile-picker">套用哪一個計畫規則？</label>
-                <select id="profile-picker"></select>
-                <small>無法自動辨識時，請手動選擇。</small>
-              </div>
-
-              <div>
-                <div class="panel__header panel__header--flush">
-                  <div>
-                    <h3>工作紀錄</h3>
-                    <p class="helper">照片辨識不到的列可自行新增。</p>
-                  </div>
-                  <button class="button button--quiet" id="add-row" type="button">新增一列</button>
-                </div>
-                <div class="entry-list" id="entry-list"></div>
-              </div>
-
-              <div class="field-grid field-grid--2">
-                <div class="field">
-                  <label for="total-hours">表上合計時數</label>
-                  <input class="input" id="total-hours" name="claimedTotalHours" type="number" min="0" step="0.5" inputmode="decimal">
-                </div>
-                <div class="field">
-                  <label for="total-pay">表上合計金額</label>
-                  <input class="input" id="total-pay" name="claimedTotalPay" type="number" min="0" step="1" inputmode="numeric">
-                </div>
-              </div>
-
-              <div class="callout callout--review" id="ocr-raw-wrap" hidden>
-                <strong>照片原始辨識文字</strong>
-                <p>若表格沒有完整帶入，請對照照片補填。這段文字不會上傳。</p>
-                <textarea id="ocr-raw" readonly></textarea>
-              </div>
-
-              <div class="actions">
-                <button class="button button--primary" id="check-button" type="submit">開始檢查</button>
-              </div>
-            </div>
-        </form>
 
         <section class="panel" id="results-panel" hidden aria-labelledby="results-title">
             <div class="panel__header">
@@ -155,11 +80,24 @@
                 <h2 id="results-title">檢查結果</h2>
                 <p class="helper" id="profile-version"></p>
               </div>
-              <button class="button button--quiet" id="back-to-review" type="button">返回修改</button>
+              <button class="button button--quiet" id="new-check-top" type="button">重新上傳</button>
             </div>
             <div class="panel__body">
               <div class="issue-summary" id="issue-summary"></div>
-              <div class="issue-list" id="issue-list"></div>
+              <div class="annotation-workspace">
+                <figure class="document-figure">
+                  <figcaption>
+                    <strong>文件標記</strong>
+                    <span>紅框或紅圈為大致位置，請用右側相同號碼核對。</span>
+                  </figcaption>
+                  <div class="annotated-document" id="annotated-document" aria-label="已標記問題的文件預覽"></div>
+                </figure>
+                <aside class="issue-column" aria-labelledby="issue-column-title">
+                  <h3 id="issue-column-title">需要修改與確認</h3>
+                  <p class="helper">文件上的號碼會對應右側的修改提醒。</p>
+                  <div class="issue-list" id="issue-list"></div>
+                </aside>
+              </div>
               <div class="manual-warning" role="note">
                 <strong>人工檢查不可省略</strong>
                 <span>檢查結果僅供提醒參考；即使顯示沒有錯誤，送件前仍須人工逐項核對。</span>

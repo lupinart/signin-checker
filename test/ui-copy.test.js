@@ -17,5 +17,14 @@ test("keeps the student page focused on a primary upload action", async () => {
   assert.doesNotMatch(html, /admin\.html|管理規則/);
   assert.doesNotMatch(html, /empty-panel|文件會在這裡展開/);
   assert.match(html, /<h2[^>]*>上傳簽到單<\/h2>/);
-  assert.ok(html.indexOf('id="upload-zone"') < html.indexOf('id="review-panel"'));
+  assert.ok(html.indexOf('id="upload-zone"') < html.indexOf('id="results-panel"'));
+});
+
+test("shows conclusions beside a numbered document annotation view without OCR text", async () => {
+  const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
+
+  assert.doesNotMatch(html, /確認辨識內容|照片原始辨識文字|id="ocr-raw"/);
+  assert.match(html, /id="annotated-document"/);
+  assert.match(html, /id="issue-list"/);
+  assert.match(html, /文件上的號碼會對應右側的修改提醒/);
 });
