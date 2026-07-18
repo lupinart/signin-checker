@@ -21,8 +21,8 @@
       <section class="intro intro--student" aria-labelledby="page-title">
         <h1 id="page-title">上傳簽到單，先自己檢查。</h1>
         <div class="intro__copy">
-          <p>上傳 Word 或直接拍照，系統會直接標出可能有問題的位置，並告訴你需要修改什麼。</p>
-          <p class="privacy-line">你的文件、照片與辨識文字不會離開這台裝置。</p>
+          <p>上傳簽到單 Word 檔，系統會直接標出可能有問題的位置，並告訴你需要修改什麼。</p>
+          <p class="privacy-line">你的文件不會離開這台裝置。</p>
           <div class="manual-warning" role="note">
             <strong>人工檢查不可省略</strong>
             <span>本工具僅供提醒參考，檢查方向與自動判讀都可能出錯或漏判。送件前務必逐項人工核對，不能把「未報錯」視為文件正確。</span>
@@ -47,76 +47,15 @@
             <div class="upload-zone" id="upload-zone">
               <div>
                 <h3>選擇檔案</h3>
-                <p class="helper">支援 DOCX、JPG、PNG、HEIC（依瀏覽器支援）。</p>
+                <p class="helper">支援 DOCX（Word）檔；也可以直接把檔案拖進來。</p>
               </div>
               <div class="upload-actions">
                 <label class="file-label file-label--primary" for="docx-input">上傳 Word</label>
                 <input class="native-file" id="docx-input" type="file" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document">
-                <label class="file-label" for="image-input">拍照／選照片</label>
-                <input class="native-file" id="image-input" type="file" accept="image/*" capture="environment">
               </div>
             </div>
             <p class="status-line" id="file-status" role="status" aria-live="polite">尚未選擇檔案。</p>
-            <div class="progress" id="ocr-progress" hidden>
-              <span>正在本機辨識照片：<strong id="ocr-percent">0%</strong></span>
-              <div class="progress__track" aria-hidden="true"><div class="progress__bar" id="ocr-bar"></div></div>
-            </div>
           </div>
-        </div>
-      </section>
-
-      <section class="panel" id="review-panel" hidden aria-labelledby="review-title">
-        <div class="panel__header">
-          <div>
-            <h2 id="review-title">核對辨識結果</h2>
-            <p class="helper" id="review-confidence"></p>
-          </div>
-          <button class="button button--quiet" id="review-cancel" type="button">重新上傳</button>
-        </div>
-        <div class="panel__body">
-          <div class="manual-warning" role="note">
-            <strong>照片辨識常有錯字</strong>
-            <span>請對照下方照片逐格修正；沒讀到的列用「新增一列」補上，內容都正確後再開始檢查。</span>
-          </div>
-          <figure class="photo-frame review-photo">
-            <img id="review-photo" alt="上傳的簽到單照片">
-          </figure>
-          <form id="review-form" novalidate>
-            <fieldset class="form-section">
-              <legend>基本資料</legend>
-              <div class="field-grid field-grid--3">
-                <div class="field"><label for="review-plan-name">計畫名稱</label><input class="input" id="review-plan-name" name="planName"></div>
-                <div class="field"><label for="review-plan-number">計畫編號</label><input class="input" id="review-plan-number" name="planNumber"></div>
-                <div class="field"><label for="review-unit">執行單位</label><input class="input" id="review-unit" name="unit"></div>
-              </div>
-              <div class="field-grid field-grid--3">
-                <div class="field"><label for="review-name">姓名</label><input class="input" id="review-name" name="name"></div>
-                <div class="field"><label for="review-department">學系</label><input class="input" id="review-department" name="department"></div>
-                <div class="field"><label for="review-student-id">學號</label><input class="input" id="review-student-id" name="studentId"></div>
-              </div>
-              <div class="field-grid field-grid--3">
-                <div class="field"><label for="review-phone">聯絡電話</label><input class="input" id="review-phone" name="phone"></div>
-              </div>
-            </fieldset>
-            <fieldset class="form-section">
-              <legend>工作列</legend>
-              <div class="review-entries" id="review-entries"></div>
-              <div class="actions">
-                <button class="button button--quiet" id="add-entry" type="button">新增一列</button>
-              </div>
-            </fieldset>
-            <fieldset class="form-section">
-              <legend>合計與頁尾</legend>
-              <div class="field-grid field-grid--3">
-                <div class="field"><label for="review-total-hours">合計時數</label><input class="input" id="review-total-hours" name="claimedTotalHours" inputmode="decimal"></div>
-                <div class="field"><label for="review-total-pay">合計金額</label><input class="input" id="review-total-pay" name="claimedTotalPay" inputmode="numeric"></div>
-                <div class="field"><label for="review-footer-signature">頁尾親筆簽名</label><input class="input" id="review-footer-signature" name="footerSignature"></div>
-              </div>
-            </fieldset>
-            <div class="actions">
-              <button class="button button--primary" id="run-check" type="submit">開始檢查</button>
-            </div>
-          </form>
         </div>
       </section>
 
@@ -137,7 +76,7 @@
                 <figure class="document-figure">
                   <figcaption>
                     <strong>文件標記</strong>
-                    <span>紅框或紅圈為大致位置，請用右側相同號碼核對。</span>
+                    <span>紅框為大致位置，請用右側相同號碼核對。</span>
                   </figcaption>
                   <div class="annotated-document" id="annotated-document" aria-label="已標記問題的文件預覽"></div>
                 </figure>

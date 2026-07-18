@@ -1,6 +1,5 @@
-import { annotateImage, annotateRenderedDocx, buildAnnotations } from "./annotations.js";
+import { annotateRenderedDocx, buildAnnotations } from "./annotations.js";
 import { parseDocx } from "./docx.js";
-import { parseOcrText, recognizeImage } from "./ocr.js";
 import { findProfile } from "./profiles.js";
 import { summarizeIssues } from "./report.js";
 import { checkTimesheet } from "./rules.js";
@@ -8,20 +7,9 @@ import { loadProfiles } from "./store.js";
 
 const elements = {
   docxInput: document.querySelector("#docx-input"),
-  imageInput: document.querySelector("#image-input"),
   uploadZone: document.querySelector("#upload-zone"),
   fileStatus: document.querySelector("#file-status"),
-  ocrProgress: document.querySelector("#ocr-progress"),
-  ocrPercent: document.querySelector("#ocr-percent"),
-  ocrBar: document.querySelector("#ocr-bar"),
   uploadStage: document.querySelector("#upload-stage"),
-  reviewPanel: document.querySelector("#review-panel"),
-  reviewConfidence: document.querySelector("#review-confidence"),
-  reviewCancel: document.querySelector("#review-cancel"),
-  reviewPhoto: document.querySelector("#review-photo"),
-  reviewForm: document.querySelector("#review-form"),
-  reviewEntries: document.querySelector("#review-entries"),
-  addEntry: document.querySelector("#add-entry"),
   resultsPanel: document.querySelector("#results-panel"),
   resultsStatus: document.querySelector("#results-status"),
   annotatedDocument: document.querySelector("#annotated-document"),
@@ -35,15 +23,10 @@ const elements = {
 
 const state = {
   profiles: [],
-  sourceUrl: null,
   currentProfile: null,
   sheet: null,
-  result: null,
-  reviewLines: [],
-  footerSignatureFound: false
+  result: null
 };
-
-let entrySequence = 0;
 
 function setStatus(message, tone = "") {
   elements.fileStatus.textContent = message;
@@ -179,18 +162,6 @@ async function renderDocxSource(buffer, sheet, annotations) {
   }
 }
 
-async function renderImageSource(url, annotations, lines) {
-  const frame = document.createElement("div");
-  frame.className = "photo-frame";
-  const image = document.createElement("img");
-  image.src = url;
-  image.alt = "已標記問題的簽到單照片";
-  frame.append(image);
-  elements.annotatedDocument.append(frame);
-  await image.decode().catch(() => {});
-  annotateImage(frame, annotations, lines, image.naturalWidth, image.naturalHeight);
-}
-
 function renderManualChecks(declarations) {
   elements.manualCheckList.replaceChildren();
   for (const declaration of declarations) {
@@ -200,7 +171,7 @@ function renderManualChecks(declarations) {
   }
 }
 
-async function showResults(sheet, source) {
+async function showResults(sheet, buffer) {
   if (!state.profiles.length) throw new Error("找不到可用的計畫規則，請聯絡管理者。");
   const matched = findProfile(state.profiles, sheet);
   const profile = matched ?? (state.profiles.length === 1 ? state.profiles[0] : null);
@@ -216,9 +187,7 @@ async function showResults(sheet, source) {
   renderManualChecks(state.result.declarations);
   elements.profileVersion.textContent = matched ? "" : `未能從文件對應計畫，暫以「${profile.planName}」的規則檢查`;
   elements.annotatedDocument.replaceChildren();
-  if (source.kind === "docx") await renderDocxSource(source.buffer, sheet, annotations);
-  else await renderImageSource(source.url, annotations, source.lines);
-  elements.reviewPanel.hidden = true;
+  await renderDocxSource(buffer, sheet, annotations);
   elements.resultsPanel.hidden = false;
   elements.uploadZone.hidden = true;
   setStep(2);
@@ -235,160 +204,17 @@ async function handleDocx(file) {
   try {
     const buffer = await file.arrayBuffer();
     const sheet = await parseDocx(buffer);
-    await showResults(sheet, { kind: "docx", buffer });
+    await showResults(sheet, buffer);
   } catch (error) {
     setStatus(error.message, "error");
   }
 }
 
-function addEntryCard(entry = {}) {
-  entrySequence += 1;
-  const card = document.createElement("article");
-  card.className = "entry-card";
-  const head = document.createElement("header");
-  const title = document.createElement("strong");
-  title.textContent = "工作列";
-  const remove = document.createElement("button");
-  remove.className = "button button--quiet";
-  remove.type = "button";
-  remove.textContent = "刪除這列";
-  remove.addEventListener("click", () => card.remove());
-  head.append(title, remove);
-  const grid = document.createElement("div");
-  grid.className = "field-grid";
-  for (const [labelText, name, type] of [
-    ["日期", "date", "date"],
-    ["開始", "start", "time"],
-    ["結束", "end", "time"],
-    ["時數", "hours", "text"],
-    ["酬金", "pay", "text"],
-    ["工作地點", "location", "text"],
-    ["工作內容", "workContent", "text"],
-    ["簽章（照片上的簽名文字）", "signature", "text"]
-  ]) {
-    const field = document.createElement("div");
-    field.className = "field";
-    const id = `entry-${entrySequence}-${name}`;
-    const label = document.createElement("label");
-    label.htmlFor = id;
-    label.textContent = labelText;
-    const input = document.createElement("input");
-    input.className = "input";
-    input.id = id;
-    input.type = type;
-    input.dataset.entryField = name;
-    if (name === "hours" || name === "pay") input.inputMode = "decimal";
-    input.value = entry[name] ?? "";
-    field.append(label, input);
-    grid.append(field);
-  }
-  card.append(head, grid);
-  elements.reviewEntries.append(card);
-}
-
-function setReviewValue(name, value) {
-  const input = elements.reviewForm.elements.namedItem(name);
-  if (input) input.value = value ?? "";
-}
-
-function renderReviewForm(sheet, confidence) {
-  for (const name of ["planName", "planNumber", "unit", "name", "department", "studentId", "phone"]) {
-    setReviewValue(name, sheet[name]);
-  }
-  setReviewValue("claimedTotalHours", sheet.claimedTotalHours);
-  setReviewValue("claimedTotalPay", sheet.claimedTotalPay);
-  setReviewValue("footerSignature", sheet.footerSignature);
-  state.footerSignatureFound = Boolean(sheet.footerSignatureFound);
-  elements.reviewEntries.replaceChildren();
-  const entries = sheet.entries?.length ? sheet.entries : [{}];
-  entries.forEach((entry) => addEntryCard(entry));
-  elements.reviewConfidence.textContent = `自動辨識信心約 ${Math.round(confidence)}%，內容以你照片上的原件為準。`;
-  elements.reviewPhoto.src = state.sourceUrl;
-  elements.uploadZone.hidden = true;
-  elements.resultsPanel.hidden = true;
-  elements.reviewPanel.hidden = false;
-  elements.reviewPanel.scrollIntoView({ behavior: "smooth", block: "start" });
-}
-
-function numberOrBlank(value) {
-  const trimmed = String(value ?? "").trim();
-  if (!trimmed) return "";
-  const parsed = Number(trimmed.replaceAll(",", ""));
-  return Number.isNaN(parsed) ? trimmed : parsed;
-}
-
-function collectReviewSheet() {
-  const form = elements.reviewForm.elements;
-  const fieldValue = (name) => form.namedItem(name).value.trim();
-  const entries = [...elements.reviewEntries.querySelectorAll(".entry-card")]
-    .map((card, index) => {
-      const value = (name) => card.querySelector(`[data-entry-field="${name}"]`).value.trim();
-      return {
-        id: String(index + 1),
-        date: value("date"),
-        start: value("start"),
-        end: value("end"),
-        hours: numberOrBlank(value("hours")),
-        pay: numberOrBlank(value("pay")),
-        location: value("location"),
-        workContent: value("workContent"),
-        signature: value("signature")
-      };
-    })
-    .filter((entry) => entry.date || entry.start || entry.end || entry.location || entry.workContent);
-  const footerSignature = fieldValue("footerSignature");
-
-  return {
-    planName: fieldValue("planName"),
-    planNumber: fieldValue("planNumber"),
-    unit: fieldValue("unit"),
-    name: fieldValue("name"),
-    department: fieldValue("department"),
-    studentId: fieldValue("studentId"),
-    phone: fieldValue("phone"),
-    footerSignature,
-    footerSignatureFound: Boolean(state.footerSignatureFound || footerSignature),
-    entries,
-    claimedTotalHours: numberOrBlank(fieldValue("claimedTotalHours")),
-    claimedTotalPay: numberOrBlank(fieldValue("claimedTotalPay"))
-  };
-}
-
-async function handleImage(file) {
-  if (state.sourceUrl) URL.revokeObjectURL(state.sourceUrl);
-  state.sourceUrl = URL.createObjectURL(file);
-  elements.ocrProgress.hidden = false;
-  setStatus(`正在本機辨識 ${file.name}，第一次載入中文模型會較久。`);
-  try {
-    const recognized = await recognizeImage(file, (progress) => {
-      elements.ocrPercent.textContent = `${progress}%`;
-      elements.ocrBar.style.setProperty("--progress-scale", String(progress / 100));
-    });
-    const workContents = [...new Set(state.profiles.flatMap((profile) => profile.allowedWorkContents ?? []))];
-    const sheet = parseOcrText(recognized.text, {}, { workContents });
-    state.reviewLines = recognized.lines;
-    renderReviewForm(sheet, recognized.confidence ?? 0);
-    setStatus("辨識完成，請在下方核對並修正內容後開始檢查。");
-  } catch (error) {
-    setStatus(`照片辨識未完成：${error.message}。請換一張清楚、正面的照片，或改用 Word。`, "error");
-  } finally {
-    elements.ocrProgress.hidden = true;
-  }
-}
-
 function clearAll() {
-  if (state.sourceUrl) URL.revokeObjectURL(state.sourceUrl);
-  state.sourceUrl = null;
   state.sheet = null;
   state.result = null;
   state.currentProfile = null;
-  state.reviewLines = [];
-  state.footerSignatureFound = false;
   elements.docxInput.value = "";
-  elements.imageInput.value = "";
-  elements.reviewPanel.hidden = true;
-  elements.reviewEntries.replaceChildren();
-  elements.reviewPhoto.removeAttribute("src");
   elements.resultsPanel.hidden = true;
   elements.annotatedDocument.replaceChildren();
   elements.uploadZone.hidden = false;
@@ -402,18 +228,7 @@ function startAnotherCheck() {
 }
 
 elements.docxInput.addEventListener("change", (event) => event.target.files[0] && handleDocx(event.target.files[0]));
-elements.imageInput.addEventListener("change", (event) => event.target.files[0] && handleImage(event.target.files[0]));
 elements.newCheckTop.addEventListener("click", startAnotherCheck);
-elements.reviewCancel.addEventListener("click", startAnotherCheck);
-elements.addEntry.addEventListener("click", () => addEntryCard());
-elements.reviewForm.addEventListener("submit", async (event) => {
-  event.preventDefault();
-  try {
-    await showResults(collectReviewSheet(), { kind: "image", url: state.sourceUrl, lines: state.reviewLines });
-  } catch (error) {
-    setStatus(error.message, "error");
-  }
-});
 
 for (const eventName of ["dragenter", "dragover"]) {
   elements.uploadZone.addEventListener(eventName, (event) => {
@@ -431,8 +246,7 @@ elements.uploadZone.addEventListener("drop", (event) => {
   const file = event.dataTransfer.files[0];
   if (!file) return;
   if (file.name.toLowerCase().endsWith(".docx")) handleDocx(file);
-  else if (file.type.startsWith("image/")) handleImage(file);
-  else setStatus("只支援 DOCX 或圖片檔。", "error");
+  else setStatus("只支援 DOCX（Word）檔。", "error");
 });
 
 try {

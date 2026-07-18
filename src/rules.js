@@ -211,14 +211,16 @@ function validateEntry(item, profile, issues) {
 
   const signature = text(item.signature).replaceAll(/[（(]手簽[)）]/g, "").replaceAll(/\s+/g, "");
   const name = text(profile.sheetName ?? "");
-  if (!signature) {
-    issues.push(makeIssue("SIGNATURE_REQUIRED", SEVERITY.error, "本筆簽章空白，請由本人手寫簽名。", {
-      entryIds: [item.id], field: "signature"
-    }));
-  } else if (name && !signature.includes(name) && !name.includes(signature)) {
-    issues.push(makeIssue("SIGNATURE_NAME_MISMATCH", SEVERITY.review, "簽章姓名似乎與上方姓名不同，請人工確認是本人手寫。", {
-      entryIds: [item.id], field: "signature"
-    }));
+  if (signature) {
+    if (name && !signature.includes(name) && !name.includes(signature)) {
+      issues.push(makeIssue("SIGNATURE_CHECK", SEVERITY.review, "簽章欄的文字與上方姓名不同。簽章必須列印後由本人手寫，請確認不是用打字代替簽名。", {
+        entryIds: [item.id], field: "signature"
+      }));
+    } else {
+      issues.push(makeIssue("SIGNATURE_CHECK", SEVERITY.review, "簽章欄已有電腦文字。簽章必須列印後由本人手寫，Word 裡打字的簽名不算。", {
+        entryIds: [item.id], field: "signature"
+      }));
+    }
   }
 
   return { ...item, dateObject: date, startMinutes: start, endMinutes: end, calculatedMinutes };
@@ -273,20 +275,13 @@ function addDailyIssues(validated, issues) {
 
 function addFooterSignatureIssues(sheet, sheetName, issues) {
   const value = text(sheet.footerSignature).replaceAll(/[（(]手簽[)）]/g, "").replaceAll(/\s+/g, "");
-  if (!sheet.footerSignatureFound) {
-    issues.push(makeIssue("FOOTER_SIGNATURE_CHECK", SEVERITY.review, "沒有辨識到文件下方的簽名欄，請人工確認頁尾已由本人手寫簽名。", {
-      field: "footerSignature"
-    }));
-    return;
-  }
-  if (!value) {
-    issues.push(makeIssue("FOOTER_SIGNATURE_REQUIRED", SEVERITY.error, "文件下方簽名欄空白，請由本人手寫簽名。", {
-      field: "footerSignature"
-    }));
-    return;
-  }
+  if (!value) return;
   if (sheetName && !value.includes(sheetName) && !sheetName.includes(value)) {
-    issues.push(makeIssue("FOOTER_SIGNATURE_NAME_MISMATCH", SEVERITY.review, "文件下方簽名似乎與上方姓名不同，請人工確認是本人手寫。", {
+    issues.push(makeIssue("FOOTER_SIGNATURE_CHECK", SEVERITY.review, "頁尾簽名欄的文字與上方姓名不同。頁尾聲明必須列印後由本人親筆簽名，請確認不是用打字代替。", {
+      field: "footerSignature"
+    }));
+  } else {
+    issues.push(makeIssue("FOOTER_SIGNATURE_CHECK", SEVERITY.review, "頁尾簽名欄已有電腦文字。頁尾聲明必須列印後由本人親筆簽名，Word 裡打字的簽名不算。", {
       field: "footerSignature"
     }));
   }
@@ -340,7 +335,7 @@ export function checkTimesheet(sheet, profile) {
       { code: "ACTUAL_LOCATION_CONFIRMED", label: "工作地點是本次實際地點，並非照抄範例。" },
       { code: "ACTUAL_WORK_CONFIRMED", label: "工作內容是本次實際完成的事項。" },
       { code: "NO_DUPLICATE_CLAIM", label: "沒有與其他計畫在同一時段重複請領。" },
-      { code: "SIGNATURES_COMPLETE", label: "每筆簽章、頁尾聲明及所有塗改處都有本人手寫簽名，且與上方姓名相同。" }
+      { code: "SIGNATURES_COMPLETE", label: "列印後：每筆簽章、頁尾聲明及所有塗改處都要本人手寫簽名，且與上方姓名相同（Word 裡打字的簽名不算）。" }
     ]
   };
 }

@@ -111,7 +111,7 @@ test("treats blank row and total wages as errors", () => {
   assert.ok(codes(result).includes("TOTAL_PAY_MISMATCH"));
 });
 
-test("requires personal fields and a signature on every work row", () => {
+test("requires personal fields on the sheet", () => {
   const result = checkTimesheet(sheet([
     entry({ signature: "" })
   ], { name: "", department: "", studentId: "", phone: "" }), profile);
@@ -120,16 +120,20 @@ test("requires personal fields and a signature on every work row", () => {
   assert.ok(codes(result).includes("DEPARTMENT_REQUIRED"));
   assert.ok(codes(result).includes("STUDENT_ID_REQUIRED"));
   assert.ok(codes(result).includes("PHONE_REQUIRED"));
-  assert.ok(codes(result).includes("SIGNATURE_REQUIRED"));
 });
 
-test("asks for review when the written signature text differs from the name", () => {
-  const result = checkTimesheet(sheet([
-    entry({ signature: "陳同學" })
-  ]), profile);
+test("treats signatures as print-then-sign reminders instead of errors", () => {
+  const blank = checkTimesheet(sheet([entry({ signature: "" })]), profile);
+  assert.ok(!codes(blank).some((code) => code.startsWith("SIGNATURE")));
 
-  assert.ok(codes(result).includes("SIGNATURE_NAME_MISMATCH"));
-  assert.match(result.declarations.find((item) => item.code === "SIGNATURES_COMPLETE").label, /本人手寫簽名.*姓名相同/);
+  const typed = checkTimesheet(sheet([entry({ signature: "柯同學" })]), profile);
+  assert.ok(codes(typed).includes("SIGNATURE_CHECK"));
+  assert.equal(typed.issues.find((issue) => issue.code === "SIGNATURE_CHECK").severity, "review");
+
+  const different = checkTimesheet(sheet([entry({ signature: "陳同學" })]), profile);
+  assert.match(different.issues.find((issue) => issue.code === "SIGNATURE_CHECK").message, /與上方姓名不同/);
+
+  assert.match(blank.declarations.find((item) => item.code === "SIGNATURES_COMPLETE").label, /本人手寫簽名.*姓名相同/);
 });
 
 test("does not demand a break when accumulated work stays within four hours", () => {
@@ -158,18 +162,16 @@ test("tells students apart between a blank wage and a miscalculated wage", () =>
   assert.doesNotMatch(wrong.issues.find((issue) => issue.code === "ROW_PAY_MISMATCH").message, /未填寫/);
 });
 
-test("checks the footer signature like the per-row signatures", () => {
-  const missingField = checkTimesheet(sheet([entry()], { footerSignatureFound: false, footerSignature: "" }), profile);
-  assert.ok(codes(missingField).includes("FOOTER_SIGNATURE_CHECK"));
-
+test("treats the footer signature as a print-then-sign reminder instead of an error", () => {
   const blank = checkTimesheet(sheet([entry()], { footerSignature: "" }), profile);
-  assert.ok(codes(blank).includes("FOOTER_SIGNATURE_REQUIRED"));
+  assert.ok(!codes(blank).some((code) => code.startsWith("FOOTER_SIGNATURE")));
+
+  const typed = checkTimesheet(sheet([entry()]), profile);
+  assert.ok(codes(typed).includes("FOOTER_SIGNATURE_CHECK"));
+  assert.equal(typed.issues.find((issue) => issue.code === "FOOTER_SIGNATURE_CHECK").severity, "review");
 
   const different = checkTimesheet(sheet([entry()], { footerSignature: "陳同學" }), profile);
-  assert.ok(codes(different).includes("FOOTER_SIGNATURE_NAME_MISMATCH"));
-
-  const matching = checkTimesheet(sheet([entry()]), profile);
-  assert.ok(!codes(matching).some((code) => code.startsWith("FOOTER_SIGNATURE")));
+  assert.match(different.issues.find((issue) => issue.code === "FOOTER_SIGNATURE_CHECK").message, /與上方姓名不同/);
 });
 
 test("keeps checking readable fields when no work rows could be read", () => {
