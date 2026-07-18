@@ -172,6 +172,15 @@ test("checks the footer signature like the per-row signatures", () => {
   assert.ok(!codes(matching).some((code) => code.startsWith("FOOTER_SIGNATURE")));
 });
 
+test("keeps checking readable fields when no work rows could be read", () => {
+  const result = checkTimesheet(sheet([]), profile);
+
+  assert.ok(codes(result).includes("ENTRIES_UNREADABLE"));
+  assert.ok(!codes(result).includes("TOTAL_HOURS_MISMATCH"));
+  assert.ok(!codes(result).includes("TOTAL_PAY_MISMATCH"));
+  assert.equal(result.issues.find((issue) => issue.code === "ENTRIES_UNREADABLE").severity, "review");
+});
+
 test("flags blocked dates, weekends and late work", () => {
   const result = checkTimesheet(sheet([
     entry({ id: "1", date: "2026-07-17" }),

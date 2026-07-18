@@ -248,14 +248,15 @@ async function handleImage(file) {
     });
     const workContents = [...new Set(state.profiles.flatMap((profile) => profile.allowedWorkContents ?? []))];
     const sheet = parseOcrText(recognized.text, {}, { workContents });
-    if (!sheet.entries.length) {
-      throw friendlyError("照片中沒有辨識出任何工作列，可能是角度、光線或手寫較難辨識。請正面重拍清楚的照片，或改用 Word 檔（最準確）。");
-    }
     await showResults(sheet, { kind: "image", url: state.sourceUrl, lines: recognized.lines });
     const confidence = Math.round(recognized.confidence ?? 0);
-    elements.ocrWarningText.textContent = confidence < 70
-      ? `本次辨識信心只有約 ${confidence}%，照片內容很可能有辨識錯誤。請逐格與原件核對；若結果明顯不對，建議改用 Word 檔。`
-      : `照片辨識（信心約 ${confidence}%）仍可能看錯手寫字，請逐格與原件核對，必要時改用 Word 檔。`;
+    if (!sheet.entries.length) {
+      elements.ocrWarningText.textContent = "這張照片沒有讀出表格裡的工作列（手寫辨識限制），表格內容請直接對原件逐列核對；上方只檢查得到讀得出的欄位。拍得更正、更亮可能會好一些。";
+    } else {
+      elements.ocrWarningText.textContent = confidence < 70
+        ? `本次辨識信心只有約 ${confidence}%，照片內容很可能有辨識錯誤。請逐格與原件核對；若結果明顯不對，建議改用 Word 檔。`
+        : `照片辨識（信心約 ${confidence}%）仍可能看錯手寫字，請逐格與原件核對，必要時改用 Word 檔。`;
+    }
     elements.ocrWarning.hidden = false;
   } catch (error) {
     setStatus(error.friendly ? error.message : `照片辨識未完成：${error.message}。請換一張清楚、正面的照片，或改用 Word。`, "error");

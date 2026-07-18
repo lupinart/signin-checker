@@ -318,12 +318,16 @@ export function checkTimesheet(sheet, profile) {
   const totalMinutes = validated.reduce((sum, item) => sum + item.calculatedMinutes, 0);
   const totalHours = roundHours(totalMinutes);
   const totalPay = roundMoney(totalHours * Number(profile.hourlyRate));
-  if (!text(sheet.claimedTotalHours)) {
+  if (!validated.length) {
+    issues.push(makeIssue("ENTRIES_UNREADABLE", SEVERITY.review, "沒有辨識出表格裡的工作列（手寫、角度或光線都可能影響）。日期、時數、酬金與每筆簽章請直接對原件逐列人工核對。", {}));
+  } else if (!text(sheet.claimedTotalHours)) {
     issues.push(makeIssue("TOTAL_HOURS_MISMATCH", SEVERITY.error, `合計時數未填寫，應為 ${totalHours} 小時。`, { field: "totalHours" }));
   } else if (Math.abs(Number(sheet.claimedTotalHours) - totalHours) > 0.001) {
     issues.push(makeIssue("TOTAL_HOURS_MISMATCH", SEVERITY.error, `合計時數應為 ${totalHours} 小時。`, { field: "totalHours" }));
   }
-  if (!text(sheet.claimedTotalPay)) {
+  if (!validated.length) {
+    // 工作列讀不到時，合計無從比對，不再另外報錯誤
+  } else if (!text(sheet.claimedTotalPay)) {
     issues.push(makeIssue("TOTAL_PAY_MISMATCH", SEVERITY.error, `合計金額未填寫，應為 ${totalPay} 元（合計 ${totalHours} 小時 × 時薪 ${Number(profile.hourlyRate)} 元）。`, { field: "totalPay" }));
   } else if (Math.abs(Number(sheet.claimedTotalPay) - totalPay) > 0.001) {
     issues.push(makeIssue("TOTAL_PAY_MISMATCH", SEVERITY.error, `合計金額應為 ${totalPay} 元（合計 ${totalHours} 小時 × 時薪 ${Number(profile.hourlyRate)} 元）。`, { field: "totalPay" }));

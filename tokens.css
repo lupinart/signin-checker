@@ -13,8 +13,9 @@
   --color-focus: oklch(55% 0.17 252);
   --color-error: oklch(47% 0.17 28);
   --color-error-paper: oklch(95% 0.025 28);
-  --color-review: oklch(48% 0.12 67);
-  --color-review-paper: oklch(95% 0.035 76);
+  --color-review: oklch(55% 0.12 82);
+  --color-review-badge: oklch(82% 0.16 90);
+  --color-review-paper: oklch(95% 0.035 82);
   --color-tip: oklch(39% 0.09 162);
   --color-tip-paper: oklch(95% 0.025 162);
   --color-shadow: oklch(20% 0.02 252 / 0.08);
