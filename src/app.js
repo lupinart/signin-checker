@@ -212,6 +212,7 @@ async function showResults(sheet, source) {
   if (source.kind === "docx") await renderDocxSource(source.buffer, sheet, annotations);
   else await renderImageSource(source.url, annotations, source.lines);
   elements.resultsPanel.hidden = false;
+  elements.uploadZone.hidden = true;
   elements.clearButton.hidden = false;
   elements.clearButton.disabled = false;
   setStep(2);
@@ -276,6 +277,7 @@ function clearAll() {
   elements.ocrWarning.hidden = true;
   elements.resultsPanel.hidden = true;
   elements.annotatedDocument.replaceChildren();
+  elements.uploadZone.hidden = false;
   elements.clearButton.hidden = true;
   elements.clearButton.disabled = true;
   setStatus("尚未選擇檔案。");
