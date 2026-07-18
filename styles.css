@@ -472,10 +472,10 @@ textarea:disabled { opacity: 0.55; cursor: not-allowed; }
 }
 
 .image-annotation[data-severity="review"] {
-  border-color: var(--color-review);
+  border-color: var(--color-review-badge);
   box-shadow: 0 0 0 var(--space-3xs) var(--color-review-paper);
 }
-.annotation-target[data-severity="review"] { outline-color: var(--color-review) !important; }
+.annotation-target[data-severity="review"] { outline-color: var(--color-review-badge) !important; }
 .annotation-badge[data-severity="review"] { background: var(--color-review-badge); color: var(--color-ink); }
 
 [data-annotation-number][data-active="true"] {
@@ -583,6 +583,19 @@ details.form-section > summary { cursor: pointer; font-weight: 800; }
 details.form-section > summary small { display: block; color: var(--color-muted); font-weight: 400; font-size: var(--text-sm); }
 details.form-section[open] > summary { margin-block-end: var(--space-md); }
 details.form-section > .form-section__body { display: grid; gap: var(--space-md); }
+.review-photo { margin: 0; }
+.review-photo img { max-width: 100%; max-height: 70vh; }
+.review-entries { display: grid; gap: var(--space-md); }
+.entry-card {
+  display: grid;
+  gap: var(--space-sm);
+  padding: var(--space-md);
+  border: var(--rule-thin) solid var(--color-rule);
+  border-radius: var(--radius-md);
+  background: var(--color-paper-2);
+}
+.entry-card header { display: flex; align-items: center; justify-content: space-between; gap: var(--space-sm); }
+#review-form { display: grid; gap: var(--space-md); }
 .switch-row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-md); }
 .switch-row input { width: 1.25rem; height: 1.25rem; accent-color: var(--color-accent); }
 .tag-list { display: flex; flex-wrap: wrap; gap: var(--space-xs); }

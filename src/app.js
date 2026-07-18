@@ -14,18 +14,22 @@ const elements = {
   ocrProgress: document.querySelector("#ocr-progress"),
   ocrPercent: document.querySelector("#ocr-percent"),
   ocrBar: document.querySelector("#ocr-bar"),
-  clearButton: document.querySelector("#clear-button"),
   uploadStage: document.querySelector("#upload-stage"),
+  reviewPanel: document.querySelector("#review-panel"),
+  reviewConfidence: document.querySelector("#review-confidence"),
+  reviewCancel: document.querySelector("#review-cancel"),
+  reviewPhoto: document.querySelector("#review-photo"),
+  reviewForm: document.querySelector("#review-form"),
+  reviewEntries: document.querySelector("#review-entries"),
+  addEntry: document.querySelector("#add-entry"),
   resultsPanel: document.querySelector("#results-panel"),
+  resultsStatus: document.querySelector("#results-status"),
   annotatedDocument: document.querySelector("#annotated-document"),
   issueSummary: document.querySelector("#issue-summary"),
   issueList: document.querySelector("#issue-list"),
   manualCheckList: document.querySelector("#manual-check-list"),
-  ocrWarning: document.querySelector("#ocr-warning"),
-  ocrWarningText: document.querySelector("#ocr-warning-text"),
-  newCheck: document.querySelector("#new-check"),
-  newCheckTop: document.querySelector("#new-check-top"),
   profileVersion: document.querySelector("#profile-version"),
+  newCheckTop: document.querySelector("#new-check-top"),
   steps: [...document.querySelectorAll("#step-list li")]
 };
 
@@ -34,8 +38,12 @@ const state = {
   sourceUrl: null,
   currentProfile: null,
   sheet: null,
-  result: null
+  result: null,
+  reviewLines: [],
+  footerSignatureFound: false
 };
+
+let entrySequence = 0;
 
 function setStatus(message, tone = "") {
   elements.fileStatus.textContent = message;
@@ -206,17 +214,19 @@ async function showResults(sheet, source) {
   const annotations = buildAnnotations(state.result.issues, sheet);
   renderIssues(annotations);
   renderManualChecks(state.result.declarations);
-  elements.ocrWarning.hidden = true;
   elements.profileVersion.textContent = matched ? "" : `未能從文件對應計畫，暫以「${profile.planName}」的規則檢查`;
   elements.annotatedDocument.replaceChildren();
   if (source.kind === "docx") await renderDocxSource(source.buffer, sheet, annotations);
   else await renderImageSource(source.url, annotations, source.lines);
+  elements.reviewPanel.hidden = true;
   elements.resultsPanel.hidden = false;
   elements.uploadZone.hidden = true;
-  elements.clearButton.hidden = false;
-  elements.clearButton.disabled = false;
   setStep(2);
-  setStatus(`檢查完成，共有 ${annotations.length} 項提醒。請依編號核對。`, annotations.length ? "error" : "success");
+  elements.resultsStatus.textContent = annotations.length
+    ? `檢查完成，共有 ${annotations.length} 項提醒，請依編號核對。`
+    : "檢查完成，沒有找到自動檢查錯誤；仍請完成下方人工核對。";
+  elements.resultsStatus.dataset.tone = annotations.length ? "error" : "success";
+  setStatus("");
   elements.resultsPanel.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
@@ -231,17 +241,124 @@ async function handleDocx(file) {
   }
 }
 
-function friendlyError(message) {
-  const error = new Error(message);
-  error.friendly = true;
-  return error;
+function addEntryCard(entry = {}) {
+  entrySequence += 1;
+  const card = document.createElement("article");
+  card.className = "entry-card";
+  const head = document.createElement("header");
+  const title = document.createElement("strong");
+  title.textContent = "工作列";
+  const remove = document.createElement("button");
+  remove.className = "button button--quiet";
+  remove.type = "button";
+  remove.textContent = "刪除這列";
+  remove.addEventListener("click", () => card.remove());
+  head.append(title, remove);
+  const grid = document.createElement("div");
+  grid.className = "field-grid";
+  for (const [labelText, name, type] of [
+    ["日期", "date", "date"],
+    ["開始", "start", "time"],
+    ["結束", "end", "time"],
+    ["時數", "hours", "text"],
+    ["酬金", "pay", "text"],
+    ["工作地點", "location", "text"],
+    ["工作內容", "workContent", "text"],
+    ["簽章（照片上的簽名文字）", "signature", "text"]
+  ]) {
+    const field = document.createElement("div");
+    field.className = "field";
+    const id = `entry-${entrySequence}-${name}`;
+    const label = document.createElement("label");
+    label.htmlFor = id;
+    label.textContent = labelText;
+    const input = document.createElement("input");
+    input.className = "input";
+    input.id = id;
+    input.type = type;
+    input.dataset.entryField = name;
+    if (name === "hours" || name === "pay") input.inputMode = "decimal";
+    input.value = entry[name] ?? "";
+    field.append(label, input);
+    grid.append(field);
+  }
+  card.append(head, grid);
+  elements.reviewEntries.append(card);
+}
+
+function setReviewValue(name, value) {
+  const input = elements.reviewForm.elements.namedItem(name);
+  if (input) input.value = value ?? "";
+}
+
+function renderReviewForm(sheet, confidence) {
+  for (const name of ["planName", "planNumber", "unit", "name", "department", "studentId", "phone"]) {
+    setReviewValue(name, sheet[name]);
+  }
+  setReviewValue("claimedTotalHours", sheet.claimedTotalHours);
+  setReviewValue("claimedTotalPay", sheet.claimedTotalPay);
+  setReviewValue("footerSignature", sheet.footerSignature);
+  state.footerSignatureFound = Boolean(sheet.footerSignatureFound);
+  elements.reviewEntries.replaceChildren();
+  const entries = sheet.entries?.length ? sheet.entries : [{}];
+  entries.forEach((entry) => addEntryCard(entry));
+  elements.reviewConfidence.textContent = `自動辨識信心約 ${Math.round(confidence)}%，內容以你照片上的原件為準。`;
+  elements.reviewPhoto.src = state.sourceUrl;
+  elements.uploadZone.hidden = true;
+  elements.resultsPanel.hidden = true;
+  elements.reviewPanel.hidden = false;
+  elements.reviewPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function numberOrBlank(value) {
+  const trimmed = String(value ?? "").trim();
+  if (!trimmed) return "";
+  const parsed = Number(trimmed.replaceAll(",", ""));
+  return Number.isNaN(parsed) ? trimmed : parsed;
+}
+
+function collectReviewSheet() {
+  const form = elements.reviewForm.elements;
+  const fieldValue = (name) => form.namedItem(name).value.trim();
+  const entries = [...elements.reviewEntries.querySelectorAll(".entry-card")]
+    .map((card, index) => {
+      const value = (name) => card.querySelector(`[data-entry-field="${name}"]`).value.trim();
+      return {
+        id: String(index + 1),
+        date: value("date"),
+        start: value("start"),
+        end: value("end"),
+        hours: numberOrBlank(value("hours")),
+        pay: numberOrBlank(value("pay")),
+        location: value("location"),
+        workContent: value("workContent"),
+        signature: value("signature")
+      };
+    })
+    .filter((entry) => entry.date || entry.start || entry.end || entry.location || entry.workContent);
+  const footerSignature = fieldValue("footerSignature");
+
+  return {
+    planName: fieldValue("planName"),
+    planNumber: fieldValue("planNumber"),
+    unit: fieldValue("unit"),
+    name: fieldValue("name"),
+    department: fieldValue("department"),
+    studentId: fieldValue("studentId"),
+    phone: fieldValue("phone"),
+    footerSignature,
+    footerSignatureFound: Boolean(state.footerSignatureFound || footerSignature),
+    entries,
+    claimedTotalHours: numberOrBlank(fieldValue("claimedTotalHours")),
+    claimedTotalPay: numberOrBlank(fieldValue("claimedTotalPay"))
+  };
 }
 
 async function handleImage(file) {
   if (state.sourceUrl) URL.revokeObjectURL(state.sourceUrl);
   state.sourceUrl = URL.createObjectURL(file);
   elements.ocrProgress.hidden = false;
-  setStatus(`正在本機辨識並檢查 ${file.name}，第一次載入中文模型會較久。`);
+  setStatus(`正在本機辨識 ${file.name}，第一次載入中文模型會較久。`);
   try {
     const recognized = await recognizeImage(file, (progress) => {
       elements.ocrPercent.textContent = `${progress}%`;
@@ -249,18 +366,11 @@ async function handleImage(file) {
     });
     const workContents = [...new Set(state.profiles.flatMap((profile) => profile.allowedWorkContents ?? []))];
     const sheet = parseOcrText(recognized.text, {}, { workContents });
-    await showResults(sheet, { kind: "image", url: state.sourceUrl, lines: recognized.lines });
-    const confidence = Math.round(recognized.confidence ?? 0);
-    if (!sheet.entries.length) {
-      elements.ocrWarningText.textContent = "這張照片沒有讀出表格裡的工作列（手寫辨識限制），表格內容請直接對原件逐列核對；上方只檢查得到讀得出的欄位。拍得更正、更亮可能會好一些。";
-    } else {
-      elements.ocrWarningText.textContent = confidence < 70
-        ? `本次辨識信心只有約 ${confidence}%，照片內容很可能有辨識錯誤。請逐格與原件核對；若結果明顯不對，建議改用 Word 檔。`
-        : `照片辨識（信心約 ${confidence}%）仍可能看錯手寫字，請逐格與原件核對，必要時改用 Word 檔。`;
-    }
-    elements.ocrWarning.hidden = false;
+    state.reviewLines = recognized.lines;
+    renderReviewForm(sheet, recognized.confidence ?? 0);
+    setStatus("辨識完成，請在下方核對並修正內容後開始檢查。");
   } catch (error) {
-    setStatus(error.friendly ? error.message : `照片辨識未完成：${error.message}。請換一張清楚、正面的照片，或改用 Word。`, "error");
+    setStatus(`照片辨識未完成：${error.message}。請換一張清楚、正面的照片，或改用 Word。`, "error");
   } finally {
     elements.ocrProgress.hidden = true;
   }
@@ -272,14 +382,16 @@ function clearAll() {
   state.sheet = null;
   state.result = null;
   state.currentProfile = null;
+  state.reviewLines = [];
+  state.footerSignatureFound = false;
   elements.docxInput.value = "";
   elements.imageInput.value = "";
-  elements.ocrWarning.hidden = true;
+  elements.reviewPanel.hidden = true;
+  elements.reviewEntries.replaceChildren();
+  elements.reviewPhoto.removeAttribute("src");
   elements.resultsPanel.hidden = true;
   elements.annotatedDocument.replaceChildren();
   elements.uploadZone.hidden = false;
-  elements.clearButton.hidden = true;
-  elements.clearButton.disabled = true;
   setStatus("尚未選擇檔案。");
   setStep(1);
 }
@@ -291,9 +403,17 @@ function startAnotherCheck() {
 
 elements.docxInput.addEventListener("change", (event) => event.target.files[0] && handleDocx(event.target.files[0]));
 elements.imageInput.addEventListener("change", (event) => event.target.files[0] && handleImage(event.target.files[0]));
-elements.clearButton.addEventListener("click", clearAll);
-elements.newCheck.addEventListener("click", startAnotherCheck);
 elements.newCheckTop.addEventListener("click", startAnotherCheck);
+elements.reviewCancel.addEventListener("click", startAnotherCheck);
+elements.addEntry.addEventListener("click", () => addEntryCard());
+elements.reviewForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  try {
+    await showResults(collectReviewSheet(), { kind: "image", url: state.sourceUrl, lines: state.reviewLines });
+  } catch (error) {
+    setStatus(error.message, "error");
+  }
+});
 
 for (const eventName of ["dragenter", "dragover"]) {
   elements.uploadZone.addEventListener(eventName, (event) => {

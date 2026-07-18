@@ -25,7 +25,7 @@
           <p class="privacy-line">你的文件、照片與辨識文字不會離開這台裝置。</p>
           <div class="manual-warning" role="note">
             <strong>人工檢查不可省略</strong>
-            <span>本工具僅供提醒參考。送件前務必逐項人工核對，不能把「未報錯」視為文件正確。</span>
+            <span>本工具僅供提醒參考，檢查方向與自動判讀都可能出錯或漏判。送件前務必逐項人工核對，不能把「未報錯」視為文件正確。</span>
           </div>
         </div>
       </section>
@@ -62,7 +62,61 @@
               <div class="progress__track" aria-hidden="true"><div class="progress__bar" id="ocr-bar"></div></div>
             </div>
           </div>
-          <button class="button button--quiet clear-button" id="clear-button" type="button" hidden disabled>清除這份資料</button>
+        </div>
+      </section>
+
+      <section class="panel" id="review-panel" hidden aria-labelledby="review-title">
+        <div class="panel__header">
+          <div>
+            <h2 id="review-title">核對辨識結果</h2>
+            <p class="helper" id="review-confidence"></p>
+          </div>
+          <button class="button button--quiet" id="review-cancel" type="button">重新上傳</button>
+        </div>
+        <div class="panel__body">
+          <div class="manual-warning" role="note">
+            <strong>照片辨識常有錯字</strong>
+            <span>請對照下方照片逐格修正；沒讀到的列用「新增一列」補上，內容都正確後再開始檢查。</span>
+          </div>
+          <figure class="photo-frame review-photo">
+            <img id="review-photo" alt="上傳的簽到單照片">
+          </figure>
+          <form id="review-form" novalidate>
+            <fieldset class="form-section">
+              <legend>基本資料</legend>
+              <div class="field-grid field-grid--3">
+                <div class="field"><label for="review-plan-name">計畫名稱</label><input class="input" id="review-plan-name" name="planName"></div>
+                <div class="field"><label for="review-plan-number">計畫編號</label><input class="input" id="review-plan-number" name="planNumber"></div>
+                <div class="field"><label for="review-unit">執行單位</label><input class="input" id="review-unit" name="unit"></div>
+              </div>
+              <div class="field-grid field-grid--3">
+                <div class="field"><label for="review-name">姓名</label><input class="input" id="review-name" name="name"></div>
+                <div class="field"><label for="review-department">學系</label><input class="input" id="review-department" name="department"></div>
+                <div class="field"><label for="review-student-id">學號</label><input class="input" id="review-student-id" name="studentId"></div>
+              </div>
+              <div class="field-grid field-grid--3">
+                <div class="field"><label for="review-phone">聯絡電話</label><input class="input" id="review-phone" name="phone"></div>
+              </div>
+            </fieldset>
+            <fieldset class="form-section">
+              <legend>工作列</legend>
+              <div class="review-entries" id="review-entries"></div>
+              <div class="actions">
+                <button class="button button--quiet" id="add-entry" type="button">新增一列</button>
+              </div>
+            </fieldset>
+            <fieldset class="form-section">
+              <legend>合計與頁尾</legend>
+              <div class="field-grid field-grid--3">
+                <div class="field"><label for="review-total-hours">合計時數</label><input class="input" id="review-total-hours" name="claimedTotalHours" inputmode="decimal"></div>
+                <div class="field"><label for="review-total-pay">合計金額</label><input class="input" id="review-total-pay" name="claimedTotalPay" inputmode="numeric"></div>
+                <div class="field"><label for="review-footer-signature">頁尾親筆簽名</label><input class="input" id="review-footer-signature" name="footerSignature"></div>
+              </div>
+            </fieldset>
+            <div class="actions">
+              <button class="button button--primary" id="run-check" type="submit">開始檢查</button>
+            </div>
+          </form>
         </div>
       </section>
 
@@ -72,15 +126,12 @@
             <div class="panel__header">
               <div>
                 <h2 id="results-title">檢查結果</h2>
+                <p class="status-line" id="results-status" role="status" aria-live="polite"></p>
                 <p class="helper" id="profile-version"></p>
               </div>
               <button class="button button--quiet" id="new-check-top" type="button">重新上傳</button>
             </div>
             <div class="panel__body">
-              <div class="manual-warning" id="ocr-warning" role="note" hidden>
-                <strong>照片辨識結果請務必核對</strong>
-                <span id="ocr-warning-text"></span>
-              </div>
               <div class="issue-summary" id="issue-summary"></div>
               <div class="annotation-workspace">
                 <figure class="document-figure">
@@ -101,9 +152,6 @@
                 <p>下面這些事工具無法自動判斷，送出前請自己核對；沒有紅框不代表文件正確。</p>
                 <ul id="manual-check-list"></ul>
               </section>
-              <div class="actions">
-                <button class="button button--quiet" id="new-check" type="button">檢查另一份</button>
-              </div>
             </div>
         </section>
       </div>
@@ -111,7 +159,7 @@
 
     <footer class="shell foot-line">
       <p>簽到前 · 送件前自我檢查</p>
-      <p>工具提供提醒，不代表校方核准或法律意見。</p>
+      <p>免責聲明：本網頁僅提供檢查方向，可能出錯或漏判；結果不代表文件正確、校方核准或法律意見。</p>
     </footer>
 
     <script type="module" src="./src/app.js"></script>
