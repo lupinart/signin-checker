@@ -1,19 +1,45 @@
-import { createClient } from "@supabase/supabase-js";
 import { DEFAULT_PROFILES } from "./profiles.js";
 
 const STORAGE_KEY = "signin-checker:profiles";
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const TOKEN_KEY = "signin-checker:github-token";
+const REPO = "lupinart/signin-checker";
+const RULES_PATH = "public/rules.json";
+const CONTENTS_API = `https://api.github.com/repos/${REPO}/contents/${RULES_PATH}`;
 
-export const cloudConfigured = Boolean(supabaseUrl && supabaseKey);
-const client = cloudConfigured ? createClient(supabaseUrl, supabaseKey) : null;
+function token() {
+  return localStorage.getItem(TOKEN_KEY) ?? "";
+}
+
+export function cloudMode() {
+  return Boolean(token());
+}
+
+function apiHeaders(tokenValue = token()) {
+  return {
+    Accept: "application/vnd.github+json",
+    Authorization: `Bearer ${tokenValue}`
+  };
+}
+
+function decodeContent(base64) {
+  const binary = atob(base64.replaceAll("\n", ""));
+  const bytes = Uint8Array.from(binary, (character) => character.codePointAt(0));
+  return new TextDecoder().decode(bytes);
+}
+
+function encodeContent(textValue) {
+  const bytes = new TextEncoder().encode(textValue);
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary);
+}
 
 function readLocal() {
   try {
     const stored = JSON.parse(localStorage.getItem(STORAGE_KEY));
-    return Array.isArray(stored) && stored.length ? stored : structuredClone(DEFAULT_PROFILES);
+    return Array.isArray(stored) && stored.length ? stored : null;
   } catch {
-    return structuredClone(DEFAULT_PROFILES);
+    return null;
   }
 }
 
@@ -21,17 +47,38 @@ function writeLocal(profiles) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(profiles));
 }
 
-export async function loadProfiles({ includeInactive = false } = {}) {
-  if (!client) {
-    const profiles = readLocal();
-    return includeInactive ? profiles : profiles.filter((profile) => profile.active !== false);
+async function fetchPublished() {
+  try {
+    const response = await fetch(`./rules.json?ts=${Date.now()}`, { cache: "no-store" });
+    if (!response.ok) return null;
+    const parsed = await response.json();
+    return Array.isArray(parsed) && parsed.length ? parsed : null;
+  } catch {
+    return null;
   }
+}
 
-  let query = client.from("project_rules").select("payload").order("updated_at", { ascending: false });
-  if (!includeInactive) query = query.eq("active", true);
-  const { data, error } = await query;
-  if (error) throw new Error(`無法取得計畫規則：${error.message}`);
-  return data.map((row) => row.payload);
+async function fetchRemoteRules() {
+  const response = await fetch(CONTENTS_API, { headers: apiHeaders(), cache: "no-store" });
+  if (!response.ok) throw new Error(`無法讀取線上規則（GitHub 回應 ${response.status}），請確認 Token 是否過期。`);
+  const data = await response.json();
+  return { profiles: JSON.parse(decodeContent(data.content)), sha: data.sha };
+}
+
+async function localProfiles() {
+  return readLocal() ?? await fetchPublished() ?? structuredClone(DEFAULT_PROFILES);
+}
+
+export async function loadProfiles({ includeInactive = false } = {}) {
+  const profiles = cloudMode() ? (await fetchRemoteRules()).profiles : await localProfiles();
+  return includeInactive ? profiles : profiles.filter((profile) => profile.active !== false);
+}
+
+function upsert(profiles, saved) {
+  const index = profiles.findIndex((item) => item.id === saved.id);
+  if (index >= 0) profiles[index] = saved;
+  else profiles.unshift(saved);
+  return profiles;
 }
 
 export async function saveProfile(profile) {
@@ -41,49 +88,40 @@ export async function saveProfile(profile) {
     updatedAt: new Date().toISOString()
   };
 
-  if (!client) {
-    const profiles = readLocal();
-    const index = profiles.findIndex((item) => item.id === saved.id);
-    if (index >= 0) profiles[index] = saved;
-    else profiles.unshift(saved);
-    writeLocal(profiles);
+  if (!cloudMode()) {
+    writeLocal(upsert(await localProfiles(), saved));
     return saved;
   }
 
-  const { error } = await client.from("project_rules").upsert({
-    id: saved.id,
-    active: saved.active,
-    version: saved.version,
-    updated_at: saved.updatedAt,
-    payload: saved
+  const { profiles, sha } = await fetchRemoteRules();
+  const response = await fetch(CONTENTS_API, {
+    method: "PUT",
+    headers: apiHeaders(),
+    body: JSON.stringify({
+      message: `rules: ${saved.planNumber} ${saved.planName}`,
+      content: encodeContent(`${JSON.stringify(upsert(profiles, saved), null, 2)}\n`),
+      sha
+    })
   });
-  if (error) throw new Error(`無法儲存計畫規則：${error.message}`);
+  if (!response.ok) throw new Error(`無法儲存到 GitHub（回應 ${response.status}），請確認 Token 是否過期或沒有寫入權限。`);
   return saved;
 }
 
-export async function deleteProfile(id) {
-  if (!client) {
-    writeLocal(readLocal().filter((profile) => profile.id !== id));
-    return;
-  }
-  const { error } = await client.from("project_rules").delete().eq("id", id);
-  if (error) throw new Error(`無法刪除計畫規則：${error.message}`);
-}
-
 export async function getSession() {
-  if (!client) return { local: true };
-  const { data, error } = await client.auth.getSession();
-  if (error) throw error;
-  return data.session;
+  return cloudMode() ? { cloud: true } : null;
 }
 
-export async function signIn(email, password) {
-  if (!client) return { local: true };
-  const { data, error } = await client.auth.signInWithPassword({ email, password });
-  if (error) throw new Error(`登入失敗：${error.message}`);
-  return data.session;
+export async function signIn(tokenValue) {
+  const trimmed = String(tokenValue ?? "").trim();
+  if (!trimmed) throw new Error("請貼上 GitHub Token。");
+  const response = await fetch(`https://api.github.com/repos/${REPO}`, { headers: apiHeaders(trimmed) });
+  if (!response.ok) throw new Error("Token 無效，或沒有這個 repo 的權限。");
+  const data = await response.json();
+  if (!data.permissions?.push) throw new Error("這個 Token 沒有寫入權限；建立時要在 Contents 勾「Read and write」。");
+  localStorage.setItem(TOKEN_KEY, trimmed);
+  return { cloud: true };
 }
 
 export async function signOut() {
-  if (client) await client.auth.signOut();
+  localStorage.removeItem(TOKEN_KEY);
 }

@@ -1,6 +1,6 @@
-import { DEFAULT_PROFILES, normalizeDateText, validateProfile } from "./profiles.js";
+import { normalizeDateText, validateProfile } from "./profiles.js";
 import {
-  cloudConfigured,
+  cloudMode,
   getSession,
   loadProfiles,
   saveProfile,
@@ -12,6 +12,7 @@ const elements = {
   loginPanel: document.querySelector("#login-panel"),
   loginForm: document.querySelector("#login-form"),
   loginStatus: document.querySelector("#login-status"),
+  localMode: document.querySelector("#local-mode"),
   layout: document.querySelector("#admin-layout"),
   storageMode: document.querySelector("#storage-mode"),
   profileList: document.querySelector("#profile-list"),
@@ -188,16 +189,18 @@ async function refresh(preferredId) {
 async function enterAdmin() {
   elements.loginPanel.hidden = true;
   elements.layout.hidden = false;
-  elements.storageMode.textContent = cloudConfigured ? "線上規則 · 儲存後所有裝置更新" : "本機規則 · 只影響這個瀏覽器";
-  elements.logout.hidden = !cloudConfigured;
+  elements.storageMode.textContent = cloudMode()
+    ? "線上規則（GitHub）· 儲存後約 1~2 分鐘全裝置生效"
+    : "本機規則 · 只影響這個瀏覽器";
+  elements.logout.hidden = !cloudMode();
   await refresh();
 }
 
 elements.loginForm.addEventListener("submit", async (event) => {
   event.preventDefault();
-  elements.loginStatus.textContent = "正在登入…";
+  elements.loginStatus.textContent = "正在確認 Token…";
   try {
-    await signIn(elements.loginForm.elements.email.value, elements.loginForm.elements.password.value);
+    await signIn(elements.loginForm.elements.token.value);
     elements.loginStatus.textContent = "";
     await enterAdmin();
   } catch (error) {
@@ -205,6 +208,8 @@ elements.loginForm.addEventListener("submit", async (event) => {
     elements.loginStatus.dataset.tone = "error";
   }
 });
+
+elements.localMode.addEventListener("click", () => enterAdmin());
 
 elements.newProfile.addEventListener("click", () => fillForm(blankProfile()));
 
@@ -224,7 +229,9 @@ elements.form.addEventListener("submit", async (event) => {
   try {
     const saved = await saveProfile(profile);
     await refresh(saved.id);
-    elements.saveStatus.textContent = "已儲存，學生頁重新整理後生效。";
+    elements.saveStatus.textContent = cloudMode()
+      ? "已儲存並發布到 GitHub，約 1~2 分鐘後學生頁生效。"
+      : "已儲存（本機模式，只影響這個瀏覽器）。";
     elements.saveStatus.dataset.tone = "success";
   } catch (error) {
     elements.saveStatus.textContent = error.message;
@@ -265,8 +272,4 @@ try {
 } catch (error) {
   elements.loginPanel.hidden = false;
   elements.loginStatus.textContent = error.message;
-}
-
-if (!cloudConfigured && !localStorage.getItem("signin-checker:profiles")) {
-  localStorage.setItem("signin-checker:profiles", JSON.stringify(DEFAULT_PROFILES));
 }

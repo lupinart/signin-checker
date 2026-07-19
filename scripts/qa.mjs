@@ -75,6 +75,7 @@ await page.screenshot({ path: artifactPath("checker-results.png"), fullPage: tru
 
 
 await page.goto(`${baseUrl}/admin.html`, { waitUntil: "networkidle" });
+await page.locator("#local-mode").click();
 await page.locator("#admin-layout").waitFor({ state: "visible" });
 assert.match(await page.locator("#storage-mode").innerText(), /本機規則/);
 await page.locator("#school-only").uncheck();

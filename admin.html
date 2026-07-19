@@ -28,19 +28,18 @@
       </section>
 
       <section class="panel" id="login-panel" hidden>
-        <div class="panel__header"><h2>管理者登入</h2></div>
+        <div class="panel__header"><h2>連接 GitHub</h2></div>
         <form class="panel__body" id="login-form">
-          <div class="field-grid field-grid--2">
-            <div class="field">
-              <label for="login-email">電子郵件</label>
-              <input class="input" id="login-email" name="email" type="email" autocomplete="username" required>
-            </div>
-            <div class="field">
-              <label for="login-password">密碼</label>
-              <input class="input" id="login-password" name="password" type="password" autocomplete="current-password" required>
-            </div>
+          <p class="helper">貼上 GitHub Token 後，儲存的規則會發布給所有裝置；約 1~2 分鐘生效。Token 只存在這個瀏覽器，不會上傳到其他地方。</p>
+          <div class="field">
+            <label for="login-token">GitHub Token</label>
+            <input class="input" id="login-token" name="token" type="password" autocomplete="off" required>
+            <small>到 GitHub「Settings → Developer settings → Fine-grained tokens」建立；Repository 只選 signin-checker，權限在 Contents 勾「Read and write」。</small>
           </div>
-          <div class="actions"><button class="button button--primary" type="submit">登入管理</button></div>
+          <div class="actions">
+            <button class="button button--primary" type="submit">連接 GitHub</button>
+            <button class="button button--quiet" id="local-mode" type="button">先用本機模式（只影響這個瀏覽器）</button>
+          </div>
           <p class="status-line" id="login-status" role="status" aria-live="polite"></p>
         </form>
       </section>

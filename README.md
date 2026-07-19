@@ -1,6 +1,6 @@
 # 簽到前
 
-工讀生／臨時工簽到單的送件前檢查工具（Word 檔專用）。DOCX 與檢查結果都只在使用者瀏覽器處理；線上資料庫只保存不含個資的計畫規則。
+工讀生／臨時工簽到單的送件前檢查工具（Word 檔專用）。DOCX 與檢查結果都只在使用者瀏覽器處理；計畫規則存放在 repo 的 `public/rules.json`，由管理頁透過 GitHub Token 直接 commit 更新。
 
 ## 本機執行（兩台 Mac 共用原始碼）
 
@@ -52,23 +52,22 @@ QA_DOCX_PATH="/完整路徑/測試簽到單.docx" QA_EXPECTED_ROWS=15 npm run qa
 
 未指定文件時會產生不含個資的測試 DOCX。Chrome 不在 macOS 預設位置時，可另外設定 `QA_CHROME_PATH`。
 
-未設定 Supabase 時，管理頁會使用瀏覽器 `localStorage`。這適合本機測試，但只影響同一個瀏覽器。
+管理頁未連接 GitHub Token 時是本機模式（存瀏覽器 `localStorage`），適合測試但只影響同一個瀏覽器。
 
-## 啟用跨裝置規則管理
+## 啟用跨裝置規則管理（GitHub Token）
 
-1. 建立 Supabase 專案。
-2. 在 Supabase SQL Editor 執行 [`supabase/schema.sql`](./supabase/schema.sql)。
-3. 在 Authentication 建立唯一管理者帳號，並關閉公開註冊。
-4. 複製 `.env.example` 為 `.env`，填入專案 URL 與公開 anon key。
-5. GitHub Pages 部署時，在 repository variables 建立 `VITE_SUPABASE_URL` 與 `VITE_SUPABASE_ANON_KEY`。
-6. 登入管理頁，儲存第一個計畫規則。
+1. GitHub 右上頭像 → Settings → Developer settings → Personal access tokens → **Fine-grained tokens** → Generate new token。
+2. Repository access 選 **Only select repositories**，只勾 `signin-checker`。
+3. Permissions → Repository permissions → **Contents** 設為 **Read and write**，其餘維持 No access。
+4. 產生後複製 Token，貼進管理頁的「連接 GitHub」欄位。
+5. 之後在管理頁儲存規則，會自動 commit 到 `public/rules.json`，GitHub Pages 重新部署後（約 1~2 分鐘）所有學生生效；每次修改都有 git 紀錄可回溯。
 
-Supabase service role key 不得放入前端、`.env` 或 GitHub Pages 變數。
+Token 只存在管理者自己的瀏覽器 `localStorage`；到期（最長一年）後重新產生一個貼上即可。
 
 ## 隱私界線
 
 - 不上傳：DOCX、姓名、學號、電話、簽名、檢查結果。
-- 線上保存：計畫名稱、計畫編號、執行單位、時薪、允許日期／時段、地點規則與工作內容規則。
+- 公開保存於 repo：計畫名稱、計畫編號、執行單位、時薪、允許日期／時段、地點規則與工作內容規則（`public/rules.json`，不含任何個資）。
 - 地點規則可切換校內限制，並設定必要文字（例如「研究室」）、房號、禁止關鍵字與範例文字。
 
 ## 基本工時依據
