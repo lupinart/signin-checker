@@ -1,5 +1,35 @@
 [
   {
+    "id": "312d139a-9b3a-4679-bd5c-f21e447dcf32",
+    "active": true,
+    "version": 1,
+    "updatedAt": "2026-07-20T01:52:29.325Z",
+    "planName": "123",
+    "planNumber": "54345",
+    "unit": "數位教育發展處數位課程發展組",
+    "hourlyRate": 196,
+    "earliestStart": "08:00",
+    "latestEnd": "18:00",
+    "allowedWeekdays": [
+      1,
+      2,
+      3,
+      4,
+      5
+    ],
+    "blockedDates": [],
+    "location": {
+      "schoolOnly": false,
+      "requireRoom": false,
+      "prompt": "請填寫本次實際工作地點，不要照抄範例。",
+      "requiredKeywords": [],
+      "forbiddenKeywords": [],
+      "sampleValues": []
+    },
+    "allowedWorkContents": [],
+    "note": ""
+  },
+  {
     "id": "a82-cloud-knowledge-2026",
     "active": true,
     "version": 2,
